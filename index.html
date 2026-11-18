@@ -1,0 +1,1936 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Simulador SARPI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: painel de instrumento — mapa do campo à esquerda, controles e leituras à direita, gráficos de taxa e espectro embaixo */
+:root {
+  --bg: #eef1ee;
+  --panel: #f9faf8;
+  --ink: #1d2622;
+  --muted: #5b6862;
+  --line: #d3dad5;
+  --field: #e3e9e2;
+  --grid: #c9d2ca;
+  --accent: #c7780f;
+  --accent-ink: #ffffff;
+  --ok: #2f7d55;
+  --warn: #b5481f;
+  --path: #44524b;
+  --win: #2f7d55;
+  --ref: #5a6fc4;
+  --e1: #2a78d6;
+  --e2: #eb6834;
+  --e3: #1baf7a;
+  --s4: #eda100; --s5: #e87ba4; --s6: #008300;
+  --f-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --f-body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141a17; --panel: #1b231f; --ink: #e4ebe6; --muted: #93a29a; --line: #2e3a34;
+    --field: #19221e; --grid: #2a3530; --accent: #f0a23a; --accent-ink: #1a1305;
+    --ok: #5cc28b; --warn: #f07a4f; --path: #b3c2ba; --win: #5cc28b; --ref: #8fa2ff; --e1: #3987e5; --e2: #d95926; --e3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141a17; --panel: #1b231f; --ink: #e4ebe6; --muted: #93a29a; --line: #2e3a34;
+  --field: #19221e; --grid: #2a3530; --accent: #f0a23a; --accent-ink: #1a1305;
+  --ok: #5cc28b; --warn: #f07a4f; --path: #b3c2ba; --win: #5cc28b; --ref: #8fa2ff; --e1: #3987e5; --e2: #d95926; --e3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 36px; display: flex; flex-direction: column; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 24px; }
+h1 { font-family: var(--f-display); font-weight: 600; font-size: 2rem; line-height: 1; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.sub { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+.tag { font-family: var(--f-mono); font-size: 0.72rem; border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; color: var(--muted); max-width: 40ch; }
+.layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
+.label { font-family: var(--f-display); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin: 0 0 8px; }
+.mapbox { position: relative; }
+#map { width: 100%; aspect-ratio: 1 / 1; max-width: 100%; display: block; cursor: crosshair; border-radius: 4px; }
+.maprow { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 0.85rem; color: var(--muted); }
+.toggles { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.toggles label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.scale { display: flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 0.72rem; }
+.note { font-size: 0.78rem; color: var(--muted); margin: 8px 0 0; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; }
+.scale i { display: block; width: 110px; height: 8px; border-radius: 2px; background: linear-gradient(90deg, #2a3c5a, #5a46a0, #c8465a, #f5a028, #ffeb8c); }
+.side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.field label { font-size: 0.78rem; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
+.field label output { font-family: var(--f-mono); color: var(--ink); }
+select, input[type="range"] { width: 100%; }
+select { font: inherit; font-size: 0.9rem; padding: 5px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); }
+input[type="range"] { accent-color: var(--accent); }
+.buttons { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+button { font: inherit; font-size: 0.88rem; font-weight: 600; padding: 7px 12px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button:hover { filter: brightness(1.05); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { grid-column: 1 / -1; font-size: 0.78rem; color: var(--muted); margin: 0; }
+.sublabel { grid-column: 1 / -1; margin: 6px 0 -2px; padding-top: 8px; border-top: 1px solid var(--line); font-family: var(--f-display); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.74rem; font-weight: 600; color: var(--muted); }
+.field label.check span { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); cursor: pointer; }
+.mini { font-size: 0.72rem; color: var(--muted); }
+.mini output { font-family: var(--f-mono); color: var(--ink); }
+input[type="range"]:disabled { opacity: 0.4; }
+.readouts { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.ro { padding: 7px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ro:nth-child(odd) { padding-right: 10px; }
+.ro.wide { grid-column: 1 / -1; }
+.ro span { font-size: 0.74rem; color: var(--muted); }
+.ro b { font-family: var(--f-mono); font-weight: 500; font-size: 0.95rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.status { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.88rem; }
+.pill { font-family: var(--f-mono); font-size: 0.72rem; padding: 3px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.pill.idle { color: var(--muted); }
+.pill.det { color: var(--warn); }
+.pill.ok { color: var(--ok); }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.charts canvas { width: 100%; height: 210px; display: block; }
+.peakhead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 8px 16px; margin-bottom: 8px; }
+.peakhead .label { margin: 0; }
+.peakctl { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.peakctl .field { width: 11rem; }
+.peakbody { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 18px; align-items: start; }
+#peakChart { width: 100%; height: 300px; display: block; }
+.peakstats { margin: 0; display: grid; grid-template-columns: 1fr; gap: 0; }
+.peakstats div { padding: 7px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 1px; }
+.peakstats dt { font-size: 0.74rem; color: var(--muted); }
+.peakstats dd { margin: 0; font-family: var(--f-mono); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+.mapright { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mapright select { width: auto; font-size: 0.8rem; padding: 3px 6px; }
+.charts2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; }
+#wfChart { width: 100%; height: 340px; display: block; }
+#convChart { width: 100%; height: 340px; display: block; }
+.cmpbody { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 20px; align-items: start; }
+#cmpMap { width: 260px; height: 260px; max-width: 100%; display: block; }
+.tablewrap { overflow-x: auto; min-width: 0; }
+.cmptable { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+.cmptable th { text-align: left; font-weight: 600; font-size: 0.74rem; color: var(--muted); border-bottom: 1px solid var(--line); padding: 6px 10px 6px 0; }
+.cmptable td { border-bottom: 1px solid var(--line); padding: 8px 10px 8px 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cmptable td:not(:first-child) { font-family: var(--f-mono); }
+.cmptable .muted { color: var(--muted); white-space: normal; font-family: var(--f-body); }
+.chartnote { font-size: 0.78rem; color: var(--muted); margin: 6px 0 0; }
+.model { font-size: 0.85rem; color: var(--muted); max-width: 90ch; }
+.model code { font-family: var(--f-mono); font-size: 0.8rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); padding: 2px 6px; border-radius: 3px; display: inline-block; overflow-x: auto; max-width: 100%; }
+.flypanel { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 6px; font-size: 0.85rem; }
+.flypanel[hidden] { display: none; }
+.flypanel p { margin: 0 0 8px; color: var(--muted); }
+.flyrow { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+.flyrow .muted { color: var(--muted); font-size: 0.8rem; }
+.dpad { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 4px; flex: none; }
+.dpad button { padding: 0; font-size: 1.1rem; }
+.pilottext { flex: 1 1 14rem; min-width: 0; }
+.patbody { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 10px; }
+.chartbox { position: relative; min-width: 0; }
+#patChart { width: 100%; height: 300px; display: block; }
+.progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+.progress[hidden] { display: none; }
+.progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-size: 0.76rem; font-family: var(--f-mono); display: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 2; }
+.toc { display: flex; flex-wrap: wrap; gap: 6px; position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0; border-bottom: 1px solid var(--line); }
+.toc a { font-family: var(--f-display); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.82rem; color: var(--ink); text-decoration: none; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+.toc a:hover { border-color: var(--accent); color: var(--accent); }
+.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 56px); }
+.block { display: flex; flex-direction: column; gap: 18px; margin-top: 18px; }
+.blockhead { border-top: 2px solid var(--ink); padding-top: 14px; }
+h2 { font-family: var(--f-display); font-weight: 600; font-size: 1.6rem; line-height: 1.05; margin: 0; text-wrap: balance; }
+.lead { margin: 8px 0 0; color: var(--muted); max-width: 78ch; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.grid2.wideleft { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
+.chart { width: 100%; height: 260px; display: block; }
+.chart.tall { height: 320px; }
+.peakbody.wide { grid-template-columns: minmax(0, 1fr) 19rem; }
+.cmptable.tw td { white-space: normal; vertical-align: top; }
+.cmptable.tw td:not(:first-child) { font-family: var(--f-body); }
+.cmptable code, .chartnote code { font-family: var(--f-mono); font-size: 0.8em; }
+.chip { display: inline-block; font-family: var(--f-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 2px 7px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; vertical-align: 1px; margin-right: 4px; }
+.chip.det { color: var(--e1); }
+.chip.sto { color: var(--accent); }
+.chip.val { color: var(--ok); }
+.list { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; max-width: 75ch; }
+.list b { font-weight: 600; }
+.model b { color: var(--ink); }
+.ok { color: var(--ok); } .bad { color: var(--warn); }
+button.small { font-size: 0.78rem; padding: 3px 9px; }
+@media (max-width: 900px) {
+  .layout, .charts, .peakbody, .charts2, .cmpbody, .patbody, .grid2, .grid2.wideleft, .peakbody.wide { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 420px) {
+  .wrap { padding-inline: 16px; }
+  .controls { grid-template-columns: 1fr; }
+  h1 { font-size: 1.65rem; }
+}
+</style>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>SARPI <span>·</span> Simulador de varredura</h1>
+      <p class="sub">Drone com o detector CZT voltado para baixo sobrevoando um campo quadrado em busca de uma fonte gama. Escolha o tipo de varredura, desenhe a sua trajetória ou pilote o drone. Clique no mapa para reposicionar a fonte.</p>
+    </div>
+  </header>
+
+  <div class="layout" id="simulador">
+    <section class="card">
+      <p class="label">Campo de varredura</p>
+      <div class="mapbox"><canvas id="map" aria-label="Mapa do campo com trajetória do drone e contagens"></canvas></div>
+      <div class="maprow">
+        <div class="toggles">
+          <label><input type="checkbox" id="showSrc" checked> Fonte real</label>
+          <label><input type="checkbox" id="showLL" checked> Verossimilhança</label>
+          <label><input type="checkbox" id="showBg" checked> Mapa do background</label>
+          <label><input type="checkbox" id="showDose" checked> Taxa de dose</label>
+        </div>
+        <div class="mapright">
+          <select id="mapView" aria-label="Visualização das contagens"><option value="points">Pontos</option><option value="interp">Mapa interpolado</option></select>
+          <div class="scale">contagens/s <i></i> máx</div>
+        </div>
+      </div>
+      <div class="flypanel" id="drawPanel" hidden>
+        <p>Clique no mapa para marcar os pontos da trajetória, na ordem em que o drone deve passar. Para mover a fonte neste modo, use Shift + clique.</p>
+        <div class="flyrow">
+          <button class="primary" id="drawGo" type="button">Voar esta trajetória</button>
+          <button id="drawUndo" type="button">Desfazer ponto</button>
+          <button id="drawClear" type="button">Limpar</button>
+          <span class="muted" id="drawInfo"></span>
+        </div>
+      </div>
+      <div class="flypanel" id="pilotPanel" hidden>
+        <div class="flyrow">
+          <div class="dpad" role="group" aria-label="Direção do drone">
+            <span></span><button type="button" data-d="0,1" aria-label="Para cima">↑</button><span></span>
+            <button type="button" data-d="-1,0" aria-label="Para a esquerda">←</button><button type="button" data-d="0,0" aria-label="Parar e pairar">■</button><button type="button" data-d="1,0" aria-label="Para a direita">→</button>
+            <span></span><button type="button" data-d="0,-1" aria-label="Para baixo">↓</button><span></span>
+          </div>
+          <div class="pilottext">
+            <p>Use as setas do teclado (ou W, A, S, D; duas teclas juntas fazem diagonais) ou os botões. O drone segue na direção escolhida, na velocidade definida; ■ ou a barra de espaço param o drone no lugar, e o detector continua medindo.</p>
+            <button class="primary" id="pilotEnd" type="button">Encerrar voo e localizar</button>
+          </div>
+        </div>
+      </div>
+      <p class="note">O mapa mostra as contagens que o estimador usa, como pontos ou interpoladas no campo: a contagem total ou só a janela do fotopico. No mapa do background, laranja é background acima da média e azul abaixo. As circunferências tracejadas marcam a taxa de dose H*(10) da fonte na altura de voo (coeficientes da ICRP 74, sem o background natural, que é tipicamente da ordem de 0,1 µSv/h).</p>
+    </section>
+
+    <div class="side">
+      <section class="card">
+        <p class="label">Parâmetros</p>
+        <div class="controls">
+          <div class="field">
+            <label for="nuc">Radionuclídeo</label>
+            <select id="nuc"><option>Cs-137</option><option>Eu-152</option><option>Co-60</option><option>Am-241</option></select>
+          </div>
+          <div class="field">
+            <label for="mode">Estimador</label>
+            <select id="mode">
+              <option value="peak_ref">Janela do fotopico + background local</option>
+              <option value="peak">Janela do fotopico</option>
+              <option value="total">Contagem total</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="strat">Tipo de varredura</label>
+            <select id="strat">
+              <option value="lines">Linhas paralelas (vai e vem)</option>
+              <option value="zigzag">Zigue-zague (diagonais)</option>
+              <option value="spiral">Espiral circular</option>
+              <option value="square_spiral">Espiral quadrada</option>
+              <option value="cross">Grade cruzada</option>
+              <option value="adapt">Adaptativa (linhas + espiral na fonte)</option>
+              <option value="draw">Desenhar trajetória no mapa</option>
+              <option value="pilot">Pilotar manualmente</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fld">Tamanho da área <output id="fldO"></output></label>
+            <input type="range" id="fld" min="10" max="60" step="5" value="20">
+          </div>
+          <div class="field">
+            <label for="act">Atividade <output id="actO"></output></label>
+            <input type="range" id="act" min="-2" max="4" step="0.05" value="0.5">
+          </div>
+          <div class="field">
+            <label for="alt">Altitude <output id="altO"></output></label>
+            <input type="range" id="alt" min="1" max="30" step="0.5" value="2">
+          </div>
+          <div class="field">
+            <label for="spd">Velocidade <output id="spdO"></output></label>
+            <input type="range" id="spd" min="0.5" max="10" step="0.5" value="1">
+          </div>
+          <div class="field">
+            <label for="spc">Espaçamento entre passadas <output id="spcO"></output></label>
+            <input type="range" id="spc" min="0.5" max="20" step="0.5" value="1">
+          </div>
+          <div class="field">
+            <label for="bkg">Background médio <output id="bkgO"></output></label>
+            <input type="range" id="bkg" min="20" max="400" step="5" value="170">
+          </div>
+          <div class="field">
+            <label for="bvar">Variação do background no campo <output id="bvarO"></output></label>
+            <input type="range" id="bvar" min="0" max="40" step="1" value="0">
+          </div>
+          <div class="field" hidden>
+            <label for="depth">Profundidade da fonte <output id="depthO"></output></label>
+            <input type="range" id="depth" min="0" max="30" step="1" value="0">
+          </div>
+          <div class="field">
+            <label for="tmp">Temperatura ambiente <output id="tmpO"></output></label>
+            <input type="range" id="tmp" min="15" max="50" step="1" value="25">
+          </div>
+          <p class="sublabel">Navegação (erros com correlação no tempo, AR(1))</p>
+          <div class="field">
+            <label for="gps">Erro do GPS (σ, τ = 5 s) <output id="gpsO"></output></label>
+            <input type="range" id="gps" min="0" max="3" step="0.1" value="0.5">
+          </div>
+          <div class="field">
+            <label for="altS">Erro de altura (σ, τ = 20 s) <output id="altSO"></output></label>
+            <input type="range" id="altS" min="0" max="1" step="0.05" value="0.1">
+          </div>
+          <div class="field">
+            <label for="att">Inclinação do drone (σ, τ = 2 s) <output id="attO"></output></label>
+            <input type="range" id="att" min="0" max="15" step="1" value="3">
+          </div>
+          <div class="field">
+            <label for="env">Espalhamento no ambiente <output id="envO"></output></label>
+            <input type="range" id="env" min="0" max="1.5" step="0.05" value="0.5">
+          </div>
+          <div hidden>
+          <p class="sublabel">Testar as hipóteses do estimador (a realidade muda; o estimador não)</p>
+          <div class="field">
+            <label for="rel">Relevo do terreno <output id="relO"></output></label>
+            <input type="range" id="rel" min="0" max="2" step="0.1" value="0">
+          </div>
+          <div class="field">
+            <label for="follow">Altura do drone</label>
+            <select id="follow"><option value="baro">Constante (barômetro)</option><option value="agl">Segue o relevo (LiDAR)</option></select>
+          </div>
+          <div class="field">
+            <label class="check" for="src2"><span><input type="checkbox" id="src2"> Segunda fonte</span></label>
+            <input type="range" id="r2" min="10" max="200" step="5" value="50" aria-label="Atividade da segunda fonte">
+            <span class="mini">Atividade <output id="r2O"></output>; Alt + clique move a fonte 2</span>
+          </div>
+          <div class="field">
+            <label for="angs">Resposta lateral real do detector <output id="angsO"></output></label>
+            <input type="range" id="angs" min="50" max="150" step="5" value="100">
+          </div>
+          </div>
+          <div class="field">
+            <label for="rate">Velocidade da simulação <output id="rateO"></output></label>
+            <input type="range" id="rate" min="1" max="40" step="1" value="15">
+          </div>
+          <div class="buttons">
+            <button class="primary" id="play" type="button">Pausar</button>
+            <button id="restart" type="button">Reiniciar voo</button>
+            <button id="newsrc" type="button">Nova fonte</button>
+            <button id="newbg" type="button">Novo mapa de background</button>
+            <button id="copy" type="button">Copiar medidas (CSV)</button>
+          </div>
+          <p class="hint" id="hint">Mudanças nos parâmetros reiniciam o voo. Cada ponto é um espectro de 1 s. A linha tracejada no mapa é a trajetória planejada. O estimador supõe uma fonte pontual, solo plano, drone nivelado e a resposta nominal do detector.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="status"><span class="pill idle" id="phase">Busca</span><span id="statusTxt">Varrendo o campo</span></div>
+        <div class="readouts">
+          <div class="ro"><span>Tempo de voo</span><b id="rTime">0:00</b></div>
+          <div class="ro"><span>Distância percorrida</span><b id="rDist">0 m</b></div>
+          <div class="ro"><span>Contagens no último segundo</span><b id="rCps">0 cps</b></div>
+          <div class="ro"><span>Background esperado nessa contagem</span><b id="rBg">—</b></div>
+          <div class="ro"><span>Posição estimada</span><b id="rEst">—</b></div>
+          <div class="ro"><span>Atividade estimada</span><b id="rA">—</b></div>
+          <div class="ro"><span>Raio da região de 95% (xy)</span><b id="rUnc">—</b></div>
+          <div class="ro"><span>Erro horizontal (xy) vs. fonte real</span><b id="rErr">—</b></div>
+          <div class="ro"><span>Fonte real dentro da região de 95%?</span><b id="rCov">—</b></div>
+          <div class="ro"><span>Região de 95%</span><b id="rReg">—</b></div>
+          <div class="ro"><span>Taxa de dose da fonte no drone</span><b id="rDose">—</b></div>
+          <div class="ro"><span>Máxima durante o voo</span><b id="rDoseMax">—</b></div>
+          <div class="ro wide"><span>Taxa de dose a 1 m da fonte (ar livre)</span><b id="rDose1">—</b></div>
+          <div class="ro wide"><span>Limiar de detecção (ΔlnL, 1% de alarme falso)</span><b id="rThr">—</b></div>
+          <div class="ro wide"><span id="idLabel">Identificação (últimos 5 s)</span><b id="rId">—</b></div>
+          <div class="ro wide"><span>Custo computacional neste navegador</span><b id="rPerf">—</b></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <section class="card peakcard">
+    <div class="peakhead">
+      <p class="label">Fotopico simulado</p>
+      <div class="peakctl">
+        <div class="field"><label for="pkLine">Linha</label><select id="pkLine"></select></div>
+        <div class="field"><label for="pkSrc">Espectro</label>
+          <select id="pkSrc">
+            <option value="near">Perto da fonte estimada</option>
+            <option value="all">Voo inteiro</option>
+            <option value="best">5 s mais intensos</option>
+            <option value="last">Últimos 5 s</option>
+          </select></div>
+      </div>
+    </div>
+    <div class="peakbody" style="grid-template-columns: minmax(0, 1fr)">
+      <canvas id="peakChart" aria-label="Espectro simulado em torno do fotopico, com o background esperado"></canvas>
+      <dl class="peakstats" id="peakStats" hidden></dl>
+    </div>
+    <p class="chartnote"><span class="swatch" style="background: var(--ink)"></span>espectro simulado (suavizado em 3 canais) &nbsp; <span class="swatch" style="background: var(--accent)"></span>forma do pico &nbsp; <span class="swatch" style="background: var(--muted)"></span>background (tracejado) &nbsp; <span class="swatch" style="background: var(--win)"></span>contagens líquidas na janela</p>
+  </section>
+
+  <section class="card">
+    <div class="peakhead">
+      <p class="label">Comparação dos estimadores no mesmo voo</p>
+      <button id="cmpNow" type="button">Comparar agora</button>
+    </div>
+    <div class="cmpbody">
+      <canvas id="cmpMap" aria-label="Posições estimadas pelos três estimadores e a fonte real"></canvas>
+      <div class="tablewrap">
+        <table class="cmptable">
+          <thead><tr><th>Estimador</th><th>Posição (m)</th><th>Erro</th><th>Resultado</th></tr></thead>
+          <tbody id="cmpTable"></tbody>
+        </table>
+        <p class="chartnote">Os três usam exatamente as mesmas medidas do voo. O círculo é a incerteza de ≈95%; ponto vazio significa que o estimador não passou do seu limiar de detecção. A estrela é a fonte real.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="peakhead">
+      <p class="label">Qual varredura detecta melhor?</p>
+      <button class="primary" id="patRun" type="button">Comparar tipos de varredura</button>
+    </div>
+    <p class="chartnote" id="patStatus">Roda centenas de voos rápidos com os parâmetros atuais (radionuclídeo, estimador, altura, velocidade, espaçamento, área, background e GPS) para cada tipo de varredura, com a fonte em posições aleatórias. Leva cerca de 1 minuto; o voo animado fica pausado enquanto isso.</p>
+    <div class="progress" id="patProg" hidden><i></i></div>
+    <div class="patbody">
+      <div class="chartbox">
+        <canvas id="patChart" aria-label="Probabilidade de detecção em função da atividade para cada tipo de varredura"></canvas>
+        <div class="tip" id="patTip"></div>
+        <div class="legend" id="patLegend"></div>
+      </div>
+      <div class="tablewrap">
+        <table class="cmptable">
+          <thead><tr><th>Varredura</th><th>Tempo de voo</th><th>Distância</th><th>Detecção (atividade atual)</th><th>Erro mediano (atividade atual)</th><th>Atividade mínima</th></tr></thead>
+          <tbody id="patTable"><tr><td colspan="6" class="muted">Clique em “Comparar tipos de varredura”.</td></tr></tbody>
+        </table>
+        <p class="chartnote">Para cada varredura, 100 voos sem fonte fixam o limiar de detecção com 1% de alarme falso; depois, 30 voos por atividade dão a curva de detecção (gráfico). <b>Atividade mínima</b> é a menor atividade detectada em 95% dos voos.</p>
+      </div>
+    </div>
+  </section>
+
+
+
+</div>
+
+<script>
+const BG_RAW = [0,0,0,0,0,0,0,0,0,0,0,79,726,1694,2920,4153,5424,6173,6769,6685,7191,7748,8120,8491,9335,9628,9690,9830,9999,9785,9796,9706,9526,8626,8598,8339,8052,8069,8435,8204,8136,8007,7799,7833,7788,7529,7439,6848,6645,6398,6229,5925,6111,5734,5588,5346,5256,5092,5109,4845,4648,4321,4288,4136,4164,4175,4271,3973,3781,3697,3522,3461,3556,3472,3280,3213,2915,2695,2633,3005,3151,3264,3157,2948,2386,1986,1874,1756,1750,1727,1604,1547,1643,1626,1587,1643,1592,1564,1581,1598,1604,1598,1474,1356,1193,1092,1047,1080,1086,1103,1182,1125,1069,1092,1114,1024,1030,1063,951,945,883,844,743,793,743,760,754,737,686,625,619,596,574,512,535,456,456,439,450,422,445,467,467,478,518,512,490,518,523,512,518,518,501,484,456,484,523,501,518,501,484,366,405,394,445,439,484,506,506,473,518,518,501,473,433,354,349,293,270,293,287,259,259,270,253,309,332,326,354,338,321,309,298,253,287,287,360,388,433,405,349,309,293,293,287,326,338,354,332,309,281,236,219,191,225,214,186,163,163,146,163,191,225,231,225,208,197,169,158,197,197,169,158,180,180,203,236,236,208,208,197,191,219,236,231,208,180,163,146,107,129,146,152,191,225,208,225,219,186,186,180,141,158,169,163,152,163,141,124,158,174,180,163,163,118,90,96,101,101,90,101,79,90,101,101,101,129,118,107,113,129,129,124,124,129,129,118,141,146,129,141,124,129,135,152,152,163,141,124,124,90,101,84,96,101,152,118,135,135,135,96,118,141,129,107,113,124,113,118,113,135,118,90,96,96,62,56,73,56,84,90,90,101,96,90,96,101,84,101,96,96,107,113,129,135,124,107,84,73,56,45,39,68,45,45,68,73,79,96,96,73,73,68,68,56,56,51,34,39,79,96,107,101,84,73,68,68,79,84,62,73,73,73,79,84,79,96,90,79,90,90,90,84,90,84,90,84,84,84,79,68,39,51,56,45,39,56,62,56,68,68,51,45,45,56,62,79,73,73,56,51,39,45,45,39,39,45,39,39,39,39,34,39,39,51,51,45,51,51,62,73,84,79,79,62,56,56,45,45,45,39,39,45,39,45,51,51,39,56,51,68,62,62,56,62,39,45,62,51,51,45,45,34,28,34,45,56,51,56,45,45,28,45,51,56,68,79,73,79,68,56,51,45,34,45,39,28,28,28,23,23,45,45,39,45,45,34,28,34,23,28,17,23,23,28,17,23,23,17,23,28,28,28,39,39,56,56,62,56,62,51,56,51,45,39,28,17,11,23,11,11,17,23,11,17,23,17,11,11,6,6,17,28,28,34,34,23,11,11,11,6,17,17,17,11,11,0,0,11,17,23,23,28,23,23,23,23,23,17,11,11,17,11,23,23,17,11,11,0,0,6,6,6,11,11,6,11,11,17,17,17,23,28,17,23,28,17,17,17,11,6,6,6,6,23,28,28,23,23,11,6,17,17,17,17,17,11,11,11,11,17,17,17,17,17,11,11,11,17,17,28,28,34,39,34,28,23,17,23,23,23,23,28,11,11,6,6,0,6,6,6,6,11,6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,6,6,11,11,11,11,11,6,0,6,6,6,6,17,11,11,11,11,0,6,6,6,6,11,6,11,11,11,6,11,6,11,17,23,17,17,11,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,6,11,17,11,11,11,6,6,6,6,11,11,6,11,11,6,6,11,6,6,6,6,6,6,6,6,6,0,0,0,0,0,0,6,6,6,6,6,0,0,0,0,17,17,23,28,28,17,17,11,6,6,0,6,11,11,11,11,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,6,6,6,0,0,0,0,0,6,6,6,6,6,0,0,0,6,6,6,6,11,6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+// ===== Física do SARPI v0.6.1 (espelho do pacote Python; sem DOM) =====
+const PHYS = (() => {
+  const NCH = 1024, EMAX = 3000, THR = 40;
+  const AX = Float64Array.from({ length: NCH }, (_, i) => (i + 0.5) * EMAX / NCH);
+  const RHO = { CZT: 5.78, Al: 2.699, air: 1.205e-3, soil: 1.6 };
+  const NE = [40, 50, 60, 80, 100, 150, 200, 300, 400, 500, 600, 800, 1000, 1250, 1500, 2000];
+  const MU = {
+    CZT: [18.99, 10.49, 6.436, 2.971, 1.646, 0.599, 0.3211, 0.1618, 0.1143, 0.0927, 0.08031, 0.06598, 0.05744, 0.05046, 0.04593, 0.04071],
+    Al: [0.5685, 0.3681, 0.2778, 0.2018, 0.1704, 0.1378, 0.1223, 0.1042, 0.09276, 0.08445, 0.07802, 0.06841, 0.06146, 0.05496, 0.05006, 0.04324],
+    air: [0.2683, 0.2080, 0.1875, 0.1662, 0.1541, 0.1356, 0.1233, 0.1067, 0.09549, 0.08712, 0.08055, 0.07074, 0.06358, 0.05687, 0.05175, 0.04447],
+    soil: [0.5058, 0.3412, 0.2660, 0.2014, 0.1738, 0.1436, 0.1282, 0.1097, 0.09783, 0.08915, 0.08236, 0.07227, 0.06495, 0.05807, 0.05288, 0.04557]
+  };
+  const NUCLIDES = {
+    "Am-241": [[59.5, 0.359]],
+    "Cs-137": [[661.7, 0.851]],
+    "Co-60": [[1173.2, 0.999], [1332.5, 1.0]],
+    "Eu-152": [[40.0, 0.585], [45.4, 0.147], [121.8, 0.285], [244.7, 0.0755], [344.3, 0.266], [411.1, 0.0224],
+      [443.9, 0.0283], [778.9, 0.129], [867.4, 0.0425], [964.1, 0.146], [1085.8, 0.101], [1089.7, 0.0173],
+      [1112.1, 0.137], [1299.1, 0.0163], [1408.0, 0.21]]
+  };
+  // interpolação linear com extremos fixos (np.interp)
+  function interp(x, xs, ys) {
+    if (x <= xs[0]) return ys[0];
+    if (x >= xs[xs.length - 1]) return ys[ys.length - 1];
+    let i = 0; while (xs[i + 1] < x) i++;
+    return ys[i] + (ys[i + 1] - ys[i]) * (x - xs[i]) / (xs[i + 1] - xs[i]);
+  }
+  const LNE = NE.map(Math.log);
+  const LMU = {}; for (const k in MU) LMU[k] = MU[k].map(Math.log);
+  const muLin = (m, E) => Math.exp(interp(Math.log(E), LNE, LMU[m])) * RHO[m];  // 1/cm
+
+  // detector: modelo de caixa provisório (dimensões do cristal e espessura do Al supostas;
+  // a resposta angular medida é objeto de outro trabalho do grupo)
+  const TOP = 16, SIDE = 6, VOL = 24, AL_CM = 0.1;
+  const PF_E = [60.0, 121.8, 344.3, 661.7, 778.9, 964.1, 1408.0].map(Math.log);
+  const PF = [0.90, 0.592, 0.221, 0.096, 0.068, 0.058, 0.033].map(Math.log);
+  const pfrac = E => Math.exp(interp(Math.log(E), PF_E, PF));
+  const fwhmRel662 = T => T <= 25 ? 0.011 : T <= 40 ? 0.011 + 0.002 * (T - 25) / 15 : 0.013 + 0.007 * Math.min(T - 40, 10) / 10;
+  let TEMP = 25, ENV = 0.5;
+  const fwhm = E => (fwhmRel662(TEMP) / 0.011) * Math.sqrt(2.505 ** 2 + (0.01464 * E) ** 2);
+
+  function erfc(x) {
+    const z = Math.abs(x), t = 1 / (1 + 0.5 * z);
+    const r = t * Math.exp(-z * z - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
+    return x >= 0 ? r : 2 - r;
+  }
+
+  // ----- resposta v2 (espelho de sarpi/resposta.py; parâmetros ajustados aos espectros do LDIN em 27/10/2026) -----
+  const RP = { pf_scale: 0.7677, tail_ratio: 0.93444, tail_len: 0.00505, tail_l0: 19.33501, tail_a: 0.42469,
+    fw: 0.04404, kw: 4.73224, kc: 3.14813, v0: 0, v1: -0.20436, cskew: 0.70645, clen: 0.70251,
+    low_frac: 0.50523, low_E: 161.30011, thr: 40.3, thr_w: 0.8 };
+  const ME = 511, DE = EMAX / NCH;
+  const norm = y => { let s = 0; for (const v of y) s += v; if (s > 0) for (let i = 0; i < y.length; i++) y[i] /= s; return y; };
+  const gaussArr = (mu, sig) => norm(Float64Array.from(AX, e => Math.exp(-0.5 * ((e - mu) / sig) ** 2)));
+  function smear(y, sigAx) {           // convolução gaussiana de largura variável
+    const out = new Float64Array(NCH);
+    for (let i = 0; i < NCH; i++) {
+      if (!(y[i] > 0)) continue;
+      const s = sigAx[i], lo = Math.max(0, Math.floor((AX[i] - 5 * s) / DE)), hi = Math.min(NCH - 1, Math.ceil((AX[i] + 5 * s) / DE));
+      let g = 0; for (let j = lo; j <= hi; j++) g += Math.exp(-0.5 * ((AX[j] - AX[i]) / s) ** 2);
+      for (let j = lo; j <= hi; j++) out[j] += y[i] * Math.exp(-0.5 * ((AX[j] - AX[i]) / s) ** 2) / g;
+    }
+    return out;
+  }
+  function skew(y, frac) {             // aprisionamento de cargas: desloca cada energia T para baixo (exponencial de comprimento frac·T)
+    const out = new Float64Array(NCH);
+    for (let i = 0; i < NCH; i++) {
+      if (!(y[i] > 0)) continue;
+      const L = Math.max(frac * AX[i], 1); let k = 0;
+      for (let j = 0; j <= i; j++) k += Math.exp(-(AX[i] - AX[j]) / L);
+      for (let j = 0; j <= i; j++) out[j] += y[i] * Math.exp(-(AX[i] - AX[j]) / L) / k;
+    }
+    return out;
+  }
+  function knT(T, E0) {                // dσ/dT de Klein–Nishina
+    const e = E0 / ME, s = T / E0;
+    if (s < 0 || s >= 1) return 0;
+    const f = 2 + s * s / (e * e * (1 - s) ** 2) + s / (1 - s) * (s - 2 / e);
+    return isFinite(f) ? f : 0;
+  }
+  const thrSoft = () => Float64Array.from(AX, e => 0.5 * erfc(-(e - RP.thr) / (Math.SQRT2 * RP.thr_w)));
+  const sigAxArr = () => Float64Array.from(AX, e => fwhm(Math.max(e, 1)) / 2.355);
+  // registro de uma linha E0 no CZT, por interação: pico + cauda + ombro + Compton (KN) + vale
+  function linha(E0) {
+    const sig = fwhm(E0) / 2.355, sigAx = sigAxArr();
+    const fp = Math.min(0.98, pfrac(E0) * RP.pf_scale);
+    const ft = Math.min(RP.tail_ratio * (E0 / 662) ** RP.tail_a * fp, 0.95 - fp);
+    const fw = Math.min(RP.fw, 0.95 - fp - ft), rest = Math.max(0, 1 - fp - ft - fw);
+    const v = Math.min(0.9, Math.max(0, RP.v0 + RP.v1 * Math.log(E0 / 662)));
+    const fv = rest * v, fc = rest * (1 - v);
+    const peak = gaussArr(E0, sig), wide = gaussArr(E0, RP.kw * sig);
+    const lam = RP.tail_l0 + RP.tail_len * E0;
+    const tail = norm(Float64Array.from(AX, e => { const d = e - E0, z = d / lam + sig * sig / (2 * lam * lam); return Math.exp(Math.min(z, 50)) * erfc((d / sig + sig / lam) / Math.SQRT2); }));
+    const Tc = E0 * 2 * (E0 / ME) / (1 + 2 * (E0 / ME));
+    let comp = norm(Float64Array.from(AX, e => e < Tc ? knT(e, E0) : 0));
+    const sk = skew(comp, RP.clen);
+    for (let i = 0; i < NCH; i++) comp[i] = (1 - RP.cskew) * comp[i] + RP.cskew * sk[i];
+    comp = norm(smear(comp, sigAx.map(s => RP.kc * s)));
+    let val = Float64Array.from(AX, e => (e >= Tc && e < E0) ? 1 : 0);
+    if (val.some(x => x)) val = smear(val, sigAx.map(s => RP.kc * s));
+    norm(val);
+    const th = thrSoft(), y = new Float64Array(NCH);
+    for (let i = 0; i < NCH; i++) y[i] = (fp * peak[i] + ft * tail[i] + fw * wide[i] + fc * comp[i] + fv * val[i]) * th[i];
+    return y;
+  }
+  // fótons da linha espalhados uma vez no ambiente (solo, bancada, ar) antes de chegar ao detector
+  function ambiente(E0) {
+    const h = new Float64Array(NCH), nmu = 721;
+    for (let k = 0; k < nmu; k++) {
+      const mu = -1 + 2 * k / (nmu - 1), Ep = E0 / (1 + (E0 / ME) * (1 - mu)), r = Ep / E0;
+      const i = Math.floor(Ep / DE); if (i >= 0 && i < NCH) h[i] += r * r * (r + 1 / r - (1 - mu * mu));
+    }
+    norm(h);
+    for (let i = 0; i < NCH; i++) { const Ea = Math.max(AX[i], 40); h[i] *= Math.min(0.98, pfrac(Ea) * RP.pf_scale * (1 + RP.tail_ratio * Math.min(1, Ea / 662))); }
+    const pk = norm(smear(h, sigAxArr()));
+    const low = norm(Float64Array.from(AX, e => e < E0 ? Math.exp(-e / RP.low_E) : 0));
+    const th = thrSoft(), y = new Float64Array(NCH);
+    for (let i = 0; i < NCH; i++) y[i] = ((1 - RP.low_frac) * pk[i] + RP.low_frac * low[i]) * th[i];
+    return y;
+  }
+  const lineCache = {};
+  function lineShape(E) {
+    const key = E + "@" + TEMP;
+    if (lineCache[key]) return lineCache[key];
+    const shape = linha(E), env = ambiente(E);
+    let fAbove = 0, eAbove = 0; for (let i = 0; i < NCH; i++) { fAbove += shape[i]; eAbove += env[i]; }
+    return (lineCache[key] = { shape, env, fAbove, eAbove });
+  }
+
+  // tudo que depende do radionuclídeo e da temperatura
+  const cache = {};
+  function prep(name) {
+    const key = name + "@" + TEMP;
+    if (cache[key]) return cache[key];
+    const lines = NUCLIDES[name];
+    const peakMask = new Uint8Array(NCH), refMask = new Uint8Array(NCH);
+    for (const [E, Y] of lines) {
+      if (Y < 0.10 || E <= THR + 10) continue;
+      const f = fwhm(E);
+      for (let i = 0; i < NCH; i++) if (AX[i] >= E - 3 * f && AX[i] <= E + 1.5 * f) peakMask[i] = 1;
+    }
+    const eTop = Math.max(...lines.map(l => l[0]));
+    for (let i = 0; i < NCH; i++) if (AX[i] >= eTop + 3 * fwhm(eTop)) refMask[i] = 1;
+    const L = lines.map(([E, Y]) => {
+      const s = lineShape(E);
+      let fw = 0, ew = 0; for (let i = 0; i < NCH; i++) if (peakMask[i]) { fw += s.shape[i]; ew += s.env[i]; }
+      return { E, Y, shape: s.shape, env: s.env, fAbove: s.fAbove, eAbove: s.eAbove, fWin: fw, eWin: ew,
+        muC: muLin("CZT", E), muA: muLin("Al", E) * AL_CM, muAir: muLin("air", E), muSoil: muLin("soil", E) };
+    });
+    return (cache[key] = { name, lines: L, peakMask, refMask });
+  }
+
+  // área efetiva (cm²) para a direção u no referencial do detector; side = escala da resposta lateral
+  function effArea(l, ux, uy, uz, side = 1) {
+    ux = Math.abs(ux); uy = Math.abs(uy); uz = Math.abs(uz);
+    const ap = TOP * uz + SIDE * side * (ux + uy);
+    const eps = 1 - Math.exp(-l.muC * VOL / Math.max(ap, 1e-9));
+    const cf = Math.max(uz, ux, uy, 0.3);
+    return ap * eps * Math.exp(-l.muA / cf);
+  }
+  // fluxo não espalhado (fótons/m²/s) de uma linha a uma distância horizontal rho e vertical dz (núcleo pontual)
+  function kernel(l, A, rho, z, depthCm = 0) {
+    const dz = z + depthCm / 100, r2 = rho * rho + dz * dz, sec = Math.sqrt(r2) / dz;
+    let tau = l.muAir * z * sec * 100; if (depthCm > 0) tau += l.muSoil * depthCm * sec;
+    return { phi: A * l.Y / (4 * Math.PI * r2) * Math.exp(-tau), tau };
+  }
+
+  // taxas (cps) total e na janela do fotopico; z em m, profundidade em cm.
+  // opt.R = atitude (matriz corpo → mundo, 9 números); opt.side = escala da resposta lateral (só na "realidade")
+  function countRates(P, A, sx, sy, x, y, z, depthCm = 0, buildup = false, perLine = null, opt = null) {
+    const dz = z + depthCm / 100, vx = sx - x, vy = sy - y;
+    const r2 = vx * vx + vy * vy + dz * dz, r = Math.sqrt(r2);
+    let ux = vx / r, uy = vy / r, uz = dz / r;
+    if (opt && opt.R) {   // u_corpo = Rᵀ u_mundo; a face do detector olha para −z do corpo
+      const R = opt.R, wx = ux, wy = uy, wz = -uz;
+      ux = R[0] * wx + R[3] * wy + R[6] * wz; uy = R[1] * wx + R[4] * wy + R[7] * wz; uz = -(R[2] * wx + R[5] * wy + R[8] * wz);
+    }
+    const side = opt && opt.side || 1;
+    let tot = 0, pk = 0;
+    for (let k = 0; k < P.lines.length; k++) {
+      const l = P.lines[k], { phi, tau } = kernel(l, A, Math.sqrt(vx * vx + vy * vy), z, depthCm);
+      const un = phi * 1e-4 * effArea(l, ux, uy, uz, side);
+      const esp = ENV + (buildup ? tau : 0);          // espalhados: ambiente + caminho (buildup linear, B − 1 = τ)
+      tot += un * (l.fAbove + esp * l.eAbove);
+      pk += un * (l.fWin + esp * l.eWin);
+      if (perLine) { perLine[2 * k] = un; perLine[2 * k + 1] = un * esp; }
+    }
+    return [tot, pk];
+  }
+  // matriz de atitude R = Rz(yaw) Ry(pitch) Rx(roll), em linhas
+  function attitude(roll, pitch, yaw) {
+    const cr = Math.cos(roll), sr = Math.sin(roll), cp = Math.cos(pitch), sp = Math.sin(pitch), cy = Math.cos(yaw), sy = Math.sin(yaw);
+    return [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr,
+      sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr,
+      -sp, cp * sr, cp * cr];
+  }
+  // área efetiva de uma linha num ângulo polar th e azimute ph (graus) — para o gráfico da resposta angular
+  function areaAt(name, E, th, ph, side = 1) {
+    const l = prep(name).lines.find(q => q.E === E) || prep(name).lines[0];
+    const t = th * Math.PI / 180, p = ph * Math.PI / 180;
+    return effArea(l, Math.sin(t) * Math.cos(p), Math.sin(t) * Math.sin(p), Math.cos(t), side);
+  }
+
+  function setTemp(T) { TEMP = T; }
+  function setEnv(e) { ENV = e; }
+  return { NCH, EMAX, THR, AX, NUCLIDES, prep, countRates, kernel, attitude, areaAt, fwhm, setTemp, setEnv, muLin, erfc, RP };
+})();
+
+// ===== Simulação, localização e interface =====
+(() => {
+  const { NCH, EMAX, AX, NUCLIDES, prep, countRates } = PHYS;
+  let FIELD = 20;
+  const DT = 1, TAU_DEAD = 5.6e-6, MAXM = 3000;
+
+  // fundo ao ar livre (IDQBRN), normalizado
+  const BG = Float64Array.from(BG_RAW); { let s = 0; for (const v of BG) s += v; for (let i = 0; i < NCH; i++) BG[i] /= s; }
+  const bgFrac = mask => { let s = 0; for (let i = 0; i < NCH; i++) if (mask[i]) s += BG[i]; return s; };
+
+  // limiares de ΔlnL para 1% de alarme falso por voo (campanhas v0.4: 10 m, 170 cps, fundo uniforme)
+  const THRESH = {
+    "Cs-137": { total: 5.9, peak: 5.6, peak_ref: 9.1 },
+    "Eu-152": { total: 6.8, peak: 7.7, peak_ref: 148.2 }
+  };
+  // limiar calibrado na própria página (voos sem fonte com os parâmetros atuais); THRESH é só o valor provisório
+  const CAL = {}; let calKey = "";
+  const thrFor = (n, m) => (CAL[calKey] && CAL[calKey][m]) ?? ((THRESH[n] && THRESH[n][m]) || null);
+
+  // ---------- aleatórios ----------
+  let seed = 20261013;
+  function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+  function gauss() { let u = 0; while (!u) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); }
+  function poisson(l) {
+    if (l <= 0) return 0;
+    if (l > 30) return Math.max(0, Math.round(l + Math.sqrt(l) * gauss()));
+    const L = Math.exp(-l); let k = 0, p = 1;
+    do { k++; p *= rnd(); } while (p > L);
+    return k - 1;
+  }
+
+  // ---------- parâmetros ----------
+  const $ = id => document.getElementById(id);
+  const P = {};
+  const fmtA = a => a >= 1e9 ? (a / 1e9).toFixed(2) + " GBq" : a >= 1e6 ? (a / 1e6).toFixed(a < 1e7 ? 1 : 0) + " MBq" : (a / 1e3).toFixed(0) + " kBq";
+  function readParams() {
+    P.nuc = $("nuc").value; P.mode = $("mode").value; P.strat = $("strat").value; P.L = +$("fld").value;
+    P.A = Math.pow(10, +$("act").value) * 1e6;
+    P.h = +$("alt").value; P.v = +$("spd").value; P.s = +$("spc").value;
+    P.b = +$("bkg").value; P.bvar = +$("bvar").value / 100; P.depth = +$("depth").value;
+    P.gps = +$("gps").value; P.T = +$("tmp").value; P.rate = +$("rate").value;
+    P.att = +$("att").value; P.altS = +$("altS").value; P.env = +$("env").value;
+    P.rel = +$("rel").value; P.follow = $("follow").value === "agl";
+    P.src2 = $("src2").checked; P.r2 = +$("r2").value / 100; P.angs = +$("angs").value / 100;
+    PHYS.setTemp(P.T); PHYS.setEnv(P.env);
+    $("attO").textContent = P.att + "°"; $("altSO").textContent = fmtM(P.altS); $("envO").textContent = P.env.toFixed(2);
+    $("relO").textContent = P.rel ? "σ = " + P.rel.toFixed(1) + " m" : "plano"; $("r2O").textContent = Math.round(P.r2 * 100) + "% da 1ª";
+    $("angsO").textContent = Math.round(P.angs * 100) + "%"; $("r2").disabled = !P.src2;
+    $("actO").textContent = fmtA(P.A); $("altO").textContent = P.h + " m"; $("spdO").textContent = P.v + " m/s";
+    $("spcO").textContent = P.s + " m"; $("bkgO").textContent = P.b + " cps"; $("bvarO").textContent = Math.round(P.bvar * 100) + "%";
+    $("depthO").textContent = P.depth + " cm"; $("gpsO").textContent = P.gps.toFixed(1) + " m";
+    $("tmpO").textContent = P.T + " °C"; $("rateO").textContent = P.rate + "×"; $("fldO").textContent = P.L + " × " + P.L + " m";
+    $("drawPanel").hidden = P.strat !== "draw"; $("pilotPanel").hidden = P.strat !== "pilot";
+  }
+
+  // ---------- campo de fundo (log-normal, correlação de 20 m) ----------
+  let BN = FIELD + 1;
+  let BGF = new Float64Array(BN * BN).fill(1), bgSeed = 7;
+  function makeBgField() {
+    const s0 = seed; seed = bgSeed * 7919 + 13;
+    const n = BN + 60, z = new Float64Array(n * n);
+    for (let i = 0; i < z.length; i++) z[i] = gauss();
+    const sig = 20 / Math.SQRT2, R = Math.ceil(3 * sig), w = [];
+    for (let k = -R; k <= R; k++) w.push(Math.exp(-0.5 * (k / sig) ** 2));
+    const tmp = new Float64Array(n * n), out = new Float64Array(n * n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { let a = 0; for (let k = -R; k <= R; k++) { const xx = Math.min(n - 1, Math.max(0, x + k)); a += w[k + R] * z[y * n + xx]; } tmp[y * n + x] = a; }
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { let a = 0; for (let k = -R; k <= R; k++) { const yy = Math.min(n - 1, Math.max(0, y + k)); a += w[k + R] * tmp[yy * n + x]; } out[y * n + x] = a; }
+    const f = new Float64Array(BN * BN); let m = 0, v = 0;
+    for (let y = 0; y < BN; y++) for (let x = 0; x < BN; x++) { const val = out[(y + 30) * n + x + 30]; f[y * BN + x] = val; m += val; }
+    m /= f.length; for (const val of f) v += (val - m) ** 2; const sd = Math.sqrt(v / f.length);
+    for (let i = 0; i < f.length; i++) f[i] = (f[i] - m) / sd;
+    BGF = f; seed = s0;
+  }
+  const bgAt = (x, y) => {
+    const i = Math.min(FIELD, Math.max(0, Math.round(x))), j = Math.min(FIELD, Math.max(0, Math.round(y)));
+    return P.b * Math.exp(P.bvar * BGF[j * BN + i] - P.bvar * P.bvar / 2);
+  };
+  // relevo: soma de ondas suaves (comprimentos de onda de 0,4 a 1,2 × a área), desvio padrão 1 antes da escala
+  let TER = [];
+  function makeTerrain() {
+    const s0 = seed; seed = bgSeed * 104729 + 7; TER = [];
+    for (let k = 0; k < 6; k++) { const lam = FIELD * (0.4 + 0.8 * rnd()), th = 2 * Math.PI * rnd(); TER.push([2 * Math.PI / lam * Math.cos(th), 2 * Math.PI / lam * Math.sin(th), 2 * Math.PI * rnd()]); }
+    seed = s0;
+  }
+  const ground = (x, y) => { if (!P.rel) return 0; let g = 0; for (const [a, b, f] of TER) g += Math.sin(a * x + b * y + f); return P.rel * g / Math.sqrt(TER.length / 2); };
+
+  // ---------- grade de localização ----------
+  let GS, GN, NPT, CX, CY;
+  function setupGrid() {
+    GN = 41; GS = FIELD / (GN - 1); NPT = GN * GN;
+    CX = new Float64Array(NPT); CY = new Float64Array(NPT);
+    for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++) { CX[j * GN + i] = i * GS; CY[j * GN + i] = j * GS; }
+  }
+  setupGrid();
+
+  // ---------- trajetórias (espelho de sarpi/flight.py) ----------
+  function planWaypoints(pat, L, s) {
+    const w = [];
+    if (pat === "lines" || pat === "cross") {
+      for (let y = s / 2, k = 0; y < L; y += s, k++) { w.push(k % 2 ? [L, y] : [0, y]); w.push(k % 2 ? [0, y] : [L, y]); }
+      if (pat === "cross") w.push(...w.slice().reverse().map(([x, y]) => [y, x]));
+    } else if (pat === "zigzag") {
+      let k = 0;
+      for (let y = 0; y < L + 1e-9; y += s, k++) w.push([k % 2 ? L : 0, y]);
+      if (w[w.length - 1][1] < L - 1e-9) w.push([k % 2 ? L : 0, L]);
+    } else if (pat === "spiral") {
+      const rmax = L / 2 > s ? L / 2 - s / 2 : L / 2, thM = 2 * Math.PI * rmax / s, n = Math.max(16, Math.ceil(thM * 8));
+      for (let i = 0; i <= n; i++) { const th = thM * i / n, r = s * th / (2 * Math.PI); w.push([L / 2 + r * Math.cos(th), L / 2 + r * Math.sin(th)]); }
+    } else if (pat === "square_spiral") {
+      let a = s / 2, b = L - s / 2; w.push([a, a]);
+      while (b - a > 1e-9) { w.push([b, a], [b, b], [a, b], [a, a + s]); a += s; b -= s; if (b - a > 1e-9) w.push([a, a]); }
+    }
+    return w;
+  }
+  const pathLength = w => { let d = 0; for (let i = 1; i < w.length; i++) d += Math.hypot(w[i][0] - w[i - 1][0], w[i][1] - w[i - 1][1]); return d; };
+  let drawPts = [];
+
+  // ---------- estado ----------
+  let S, PR, srcTpl, wfB, wrB;
+  let src = { x: FIELD * (0.25 + 0.5 * rnd()), y: FIELD * (0.25 + 0.5 * rnd()) };
+  let src2 = { x: FIELD - src.x * 0.8, y: FIELD * (0.15 + 0.7 * rnd()) };
+  let terImg = null;
+  function reset() {
+    readParams();
+    if (P.L !== FIELD) {
+      const f = P.L / FIELD;
+      FIELD = P.L; BN = FIELD + 1; setupGrid(); makeBgField(); makeTerrain(); bgImg = null; terImg = null;
+      src = { x: Math.min(FIELD, src.x * f), y: Math.min(FIELD, src.y * f) };
+      src2 = { x: Math.min(FIELD, src2.x * f), y: Math.min(FIELD, src2.y * f) };
+      drawPts = drawPts.map(([x, y]) => [Math.min(FIELD, x * f), Math.min(FIELD, y * f)]);
+    }
+    PR = prep(P.nuc);
+    fillLines();
+    wfB = bgFrac(PR.peakMask); wrB = bgFrac(PR.refMask);
+    S = {
+      t: 0, dist: 0, x: 0, y: 0, wps: [], phase: "busca", done: false,
+      mx: [], my: [], tx: [], ty: [], nTot: [], nPk: [], nRef: [], bgTrue: [], used: [], live: [],
+      cap: 512, M: 0, Gt: new Float32Array(NPT * 512), Gp: new Float32Array(NPT * 512), sumGt: new Float64Array(NPT), sumGp: new Float64Array(NPT), hist: [], cmp: null, firstDet: null, interpKey: -1,
+      Aest: new Float64Array(NPT).fill(1e7), best: -1, D: 0, ll: new Float64Array(NPT), unc: null,
+      win: [], specs: [], sinceEst: 0, bHat: null
+    };
+    S.dir = [0, 0]; S.pilotEnd = false; S.capHit = false; S.waiting = false;
+    // erros de navegação AR(1), começando na distribuição estacionária (como sarpi/flight.ar1)
+    S.gE = [P.gps * gauss(), P.gps * gauss()]; S.aE = P.altS * gauss();
+    S.roll = P.att * gauss(); S.pitch = P.att * gauss(); S.head = 0;
+    S.zt = []; S.rollH = []; S.pitchH = []; S.perf = { step: 0, est: 0 };
+    if (P.strat === "pilot") { S.wps = []; S.x = FIELD / 2; S.y = 0; S.phase = "piloto"; }
+    else {
+      S.wps = P.strat === "draw" ? drawPts.map(p => p.slice())
+        : planWaypoints(P.strat === "adapt" ? "lines" : P.strat, FIELD, P.strat === "adapt" ? P.s * 2 : P.s);
+      if (S.wps.length) [S.x, S.y] = S.wps[0];
+      if (P.strat === "draw" && S.wps.length < 2) { S.done = true; S.waiting = true; }
+    }
+    S.plan = S.wps.map(p => p.slice());
+    updateDrawInfo();
+  }
+  function updateDrawInfo() {
+    const n = drawPts.length, d = pathLength(drawPts);
+    $("drawInfo").textContent = n ? `${n} ponto${n > 1 ? "s" : ""} · ${d.toFixed(0)} m · ≈ ${fmtT(d / P.v)} de voo` : "Nenhum ponto marcado";
+  }
+
+  const perLine = new Float64Array(64);
+
+  // ---------- taxa de dose H*(10) (coeficientes da ICRP 74; espelho de sarpi/dose.py) ----------
+  const H10E = [10, 15, 20, 30, 40, 50, 60, 80, 100, 150, 200, 300, 400, 500, 600, 800, 1000, 1500, 2000, 3000].map(Math.log);
+  const H10H = [0.061, 0.83, 1.05, 0.81, 0.64, 0.55, 0.51, 0.53, 0.61, 0.89, 1.20, 1.80, 2.38, 2.93, 3.44, 4.38, 5.20, 6.90, 8.60, 11.1].map(Math.log);
+  function h10(E) {   // pSv·cm²
+    const x = Math.log(E);
+    if (x <= H10E[0]) return Math.exp(H10H[0]);
+    let i = 0; while (i < H10E.length - 2 && H10E[i + 1] < x) i++;
+    return Math.exp(H10H[i] + (H10H[i + 1] - H10H[i]) * (x - H10E[i]) / (H10E[i + 1] - H10E[i]));
+  }
+  // µSv/h num ponto a altura z (m) e distância horizontal rho (m) da fonte, com buildup linear
+  function doseRate(A, rho, z, depthCm = P.depth) {
+    const dz = z + depthCm / 100, r = Math.hypot(rho, dz), sec = r / dz;
+    let t = 0;
+    for (const l of PR.lines) {
+      const tau = l.muAir * z * sec * 100 + (depthCm > 0 ? l.muSoil * depthCm * sec : 0);
+      t += A * l.Y / (4 * Math.PI * (r * 100) ** 2) * Math.exp(-tau) * (1 + tau) * h10(l.E);
+    }
+    return t * 3600 * 1e-6;
+  }
+  const fmtDose = v => !(v > 0) ? "—" : v < 1e-3 ? (v * 1e6).toFixed(0) + " pSv/h" : v < 1 ? (v * 1e3).toPrecision(v < 0.01 ? 2 : 3) + " nSv/h"
+    : v < 1000 ? v.toPrecision(3) + " µSv/h" : (v / 1000).toPrecision(3) + " mSv/h";
+  function step() {
+    if (S.done) return;
+    const tStep = performance.now();
+    // movimento, guardando 3 pontos do trecho para integrar a taxa
+    const pts = [];
+    if (P.strat === "pilot") {
+      const [dx, dy] = S.dir, cl = v => Math.min(FIELD, Math.max(0, v));
+      S.wps = (dx || dy) ? [[cl(S.x + dx * P.v * DT), cl(S.y + dy * P.v * DT)]] : [];
+    }
+    let left = P.v * DT, seg = 0;
+    const mark = [P.v * DT / 6, P.v * DT / 2, 5 * P.v * DT / 6];
+    let mi = 0, travelled = 0;
+    while (left > 0 && S.wps.length) {
+      const [wx, wy] = S.wps[0], dx = wx - S.x, dy = wy - S.y, d = Math.hypot(dx, dy);
+      const stepLen = Math.min(d, left);
+      while (mi < 3 && mark[mi] <= travelled + stepLen) {
+        const f = d > 0 ? (mark[mi] - travelled) / d : 0;
+        pts.push([S.x + dx * f, S.y + dy * f]); mi++;
+      }
+      if (d <= left) { S.x = wx; S.y = wy; S.wps.shift(); } else { S.x += dx / d * left; S.y += dy / d * left; }
+      travelled += stepLen; left -= stepLen; S.dist += stepLen;
+    }
+    while (pts.length < 3) pts.push([S.x, S.y]);
+    S.t += DT;
+
+    // erros de navegação AR(1): GPS (τ = 5 s), altura (τ = 20 s), atitude (τ = 2 s)
+    const ar = (e, sig, tau) => { const f = Math.exp(-DT / tau); return f * e + sig * Math.sqrt(1 - f * f) * gauss(); };
+    S.gE = [ar(S.gE[0], P.gps, 5), ar(S.gE[1], P.gps, 5)]; S.aE = ar(S.aE, P.altS, 20);
+    S.roll = ar(S.roll, P.att, 2); S.pitch = ar(S.pitch, P.att, 2);
+    const hx = pts[2][0] - pts[0][0], hy = pts[2][1] - pts[0][1];
+    if (Math.hypot(hx, hy) > 1e-6) S.head = Math.atan2(hy, hx);
+    const R = PHYS.attitude(S.roll * Math.PI / 180, S.pitch * Math.PI / 180, S.head), opt = { R, side: P.angs };
+    // distância vertical detector–fonte: altura de voo + erro do barômetro, corrigida pelo relevo
+    const zAt = (px, py, s) => Math.max(0.3, P.h + S.aE + (P.follow ? ground(px, py) : 0) - ground(s.x, s.y));
+
+    // taxas esperadas e espectro do segundo (fonte principal e, se ligada, a segunda fonte)
+    const mean = new Float64Array(NCH);
+    let srcTot = 0, srcPk = 0;
+    const sources = P.src2 ? [[src, P.A], [src2, P.A * P.r2]] : [[src, P.A]];
+    for (const [px, py] of pts) for (const [s, A] of sources) {
+      const [t, p] = countRates(PR, A, s.x, s.y, px, py, zAt(px, py, s), P.depth, true, perLine, opt);
+      srcTot += t / 3; srcPk += p / 3;
+      for (let k = 0; k < PR.lines.length; k++) {
+        const l = PR.lines[k], un = perLine[2 * k] / 3, esp = perLine[2 * k + 1] / 3;
+        if (un <= 0) continue;
+        for (let i = 0; i < NCH; i++) mean[i] += un * l.shape[i] + esp * l.env[i];
+      }
+    }
+    const [cx, cy] = pts[1];
+    S.zt.push(zAt(cx, cy, src)); S.rollH.push(S.roll); S.pitchH.push(S.pitch);
+    S.doseNow = doseRate(P.A, Math.hypot(cx - src.x, cy - src.y), zAt(cx, cy, src))
+      + (P.src2 ? doseRate(P.A * P.r2, Math.hypot(cx - src2.x, cy - src2.y), zAt(cx, cy, src2)) : 0);
+    S.doseMax = Math.max(S.doseMax || 0, S.doseNow);
+    const bg = bgAt(cx, cy);
+    const fDead = 1 / (1 + (srcTot + bg) * TAU_DEAD);
+    const spec = new Float64Array(NCH);
+    let nTot = 0, nPk = 0, nRef = 0;
+    for (let i = 0; i < NCH; i++) {
+      const c = poisson((mean[i] + bg * BG[i]) * fDead * DT);
+      spec[i] = c; nTot += c;
+      if (PR.peakMask[i]) nPk += c;
+      if (PR.refMask[i]) nRef += c;
+    }
+    const mx = cx + S.gE[0], my = cy + S.gE[1];
+    S.mx.push(mx); S.my.push(my); S.tx.push(cx); S.ty.push(cy);
+    S.nTot.push(nTot); S.nPk.push(nPk); S.nRef.push(nRef); S.bgTrue.push(bg);
+    S.live.push(fDead);   // o M400 registra o tempo vivo de cada espectro
+    S.maxRate = Math.max(S.maxRate || 0, srcTot + bg);
+    S.used.push(P.mode === "total" ? nTot : nPk);
+    S.win.push(spec); if (S.win.length > 5) S.win.shift();
+    S.specs.push(Float32Array.from(spec));
+    addColumn(mx, my);
+    S.perf.step = 0.8 * S.perf.step + 0.2 * (performance.now() - tStep);
+    S.sinceEst++;
+    if (S.sinceEst >= Math.max(4, Math.ceil(P.rate / 2)) || !S.wps.length) { estimate(6); S.sinceEst = 0; }
+    const thr = thrFor(P.nuc, P.mode) ?? 10;
+    if (P.strat === "adapt" && S.phase === "busca" && S.D > Math.max(2 * thr, 15) && S.M > 15) startSpiral();
+    if (P.strat === "pilot") S.wps = [];
+    if (S.M >= MAXM) S.capHit = true;
+    const finished = S.capHit || (P.strat === "pilot" ? S.pilotEnd : !S.wps.length);
+    if (finished) {
+      estimate(40);
+      if (!S.capHit && P.strat === "adapt" && S.phase === "espiral") { S.phase = "retorno"; S.wps.push([CX[S.best], CY[S.best]]); }
+      else {
+        S.done = true; compareEstimators();
+        if (S.capHit) $("hint").textContent = `O voo parou no limite de ${MAXM} espectros (${fmtT(MAXM * DT)} de voo). Aumente o espaçamento ou a velocidade, ou diminua a área.`;
+      }
+    }
+  }
+
+  function startSpiral() {
+    S.phase = "espiral";
+    const cx = CX[S.best], cy = CY[S.best], wp = [[cx, cy]], steps = 72;
+    for (let k = 0; k <= steps; k++) {
+      const th = k / 24 * 2 * Math.PI, r = FIELD * (0.02 + 0.14 * k / steps);
+      wp.push([Math.min(FIELD, Math.max(0, cx + r * Math.cos(th))), Math.min(FIELD, Math.max(0, cy + r * Math.sin(th)))]);
+    }
+    S.wps = wp;
+  }
+
+  function addColumn(mx, my) {
+    if (S.M >= S.cap) {
+      const nc = S.cap * 2, Gt = new Float32Array(NPT * nc), Gp = new Float32Array(NPT * nc);
+      for (let p = 0; p < NPT; p++) {
+        Gt.set(S.Gt.subarray(p * S.cap, p * S.cap + S.M), p * nc);
+        Gp.set(S.Gp.subarray(p * S.cap, p * S.cap + S.M), p * nc);
+      }
+      S.Gt = Gt; S.Gp = Gp; S.cap = nc;
+    }
+    const i = S.M, lv = S.live[i] ?? 1;
+    for (let p = 0; p < NPT; p++) {
+      let [t, pk] = countRates(PR, 1, CX[p], CY[p], mx, my, P.h);
+      t *= lv; pk *= lv;
+      S.Gt[p * S.cap + i] = t * DT; S.sumGt[p] += t * DT;
+      S.Gp[p * S.cap + i] = pk * DT; S.sumGp[p] += pk * DT;
+    }
+    S.M++;
+  }
+
+  function refCov(mode = P.mode) {
+    if (mode !== "peak_ref") return null;
+    const n = S.nRef, M = n.length, k = 9, h = (k - 1) / 2, s = new Float64Array(M);
+    for (let i = 0; i < M; i++) {
+      let a = 0, c = 0;
+      for (let j = Math.max(0, i - h); j <= Math.min(M - 1, i + h); j++) { a += n[j]; c++; }
+      s[i] = Math.max(a / c, 0.5 / k);
+    }
+    return s;
+  }
+
+  // dados de cada estimador: contagens, matriz de resposta e forma do background
+  function modeData(mode) {
+    return mode === "total"
+      ? { n: S.nTot, G: S.Gt, sumG: S.sumGt, s: S.live }
+      : { n: S.nPk, G: S.Gp, sumG: S.sumGp, s: mode === "peak_ref" ? refCov(mode) : S.live };
+  }
+
+  // máxima verossimilhança de Poisson na grade, com atividade e background ajustados por EM
+  function fitGrid(mode, Aarr, bArr, llOut, iters) {
+    const { n, G, sumG, s } = modeData(mode), M = S.M, cap = S.cap;
+    let sumS = M, sumN = 0;
+    for (let i = 0; i < M; i++) sumN += n[i];
+    if (s) { sumS = 0; for (let i = 0; i < M; i++) sumS += s[i]; }
+    const k0 = Math.max(sumN / sumS, 1e-9);
+    let ll0 = 0;
+    for (let i = 0; i < M; i++) { const mu = k0 * (s ? s[i] : 1); ll0 += n[i] * Math.log(mu) - mu; }
+    let best = 0, bestLL = -Infinity;
+    for (let p = 0; p < NPT; p++) {
+      let A = Aarr[p], b = bArr[p] > 0 ? bArr[p] : k0;
+      const o = p * cap;
+      for (let it = 0; it < iters; it++) {
+        let sA = 0, sB = 0;
+        for (let i = 0; i < M; i++) {
+          const g = G[o + i], si = s ? s[i] : 1, r = n[i] / (A * g + b * si);
+          sA += r * g; sB += r * si;
+        }
+        A = Math.max(A * sA / sumG[p], 0); b = b * sB / sumS;
+      }
+      Aarr[p] = Math.max(A, 1); bArr[p] = b;
+      let ll = 0;
+      for (let i = 0; i < M; i++) { const mu = A * G[o + i] + b * (s ? s[i] : 1); ll += n[i] * Math.log(mu) - mu; }
+      llOut[p] = ll;
+      if (ll > bestLL) { bestLL = ll; best = p; }
+    }
+    const reg = regFor(mode);
+    let cells = 0; for (let p = 0; p < NPT; p++) if (llOut[p] - bestLL > -reg) cells++;
+    return { best, D: bestLL - ll0, unc: Math.sqrt(cells * GS * GS / Math.PI), A: Aarr[best], b: bArr[best] };
+  }
+  // região de ≈95%: ΔlnL ≤ 3,0 (Wilks, posições exatas) ou o valor calibrado com voos com fonte e erros de navegação
+  const REG = {};
+  const regKey = () => [calibKey(), P.mode, P.A.toPrecision(3), P.depth, P.altS, P.att, P.env].join("|");
+  const regFor = mode => (REG[regKey()] && REG[regKey()][mode]) || 3.0;
+  // erro horizontal (xy) até a fonte real mais próxima
+  function errXY(x, y) {
+    const e1 = Math.hypot(x - src.x, y - src.y);
+    return P.src2 ? Math.min(e1, Math.hypot(x - src2.x, y - src2.y)) : e1;
+  }
+
+  function estimate(iters) {
+    const t0 = performance.now();
+    if (!S.bArr || S.bArr.length !== NPT) S.bArr = new Float64Array(NPT);
+    const r = fitGrid(P.mode, S.Aest, S.bArr, S.ll, iters);
+    S.best = r.best; S.D = r.D; S.unc = r.unc;
+    const det = r.D > (thrFor(P.nuc, P.mode) ?? 10);
+    if (det && S.firstDet === null) S.firstDet = S.t;
+    S.hist.push({ t: S.t, D: r.D, det, err: errXY(CX[r.best], CY[r.best]), unc: r.unc });
+    S.perf.est = performance.now() - t0; S.perf.estIt = iters;
+  }
+  // a fonte real (a mais próxima, com duas fontes) está dentro da região de 95%?
+  function covered() {
+    if (S.best < 0) return null;
+    const s = !P.src2 || Math.hypot(CX[S.best] - src.x, CY[S.best] - src.y) <= Math.hypot(CX[S.best] - src2.x, CY[S.best] - src2.y) ? src : src2;
+    const i = Math.min(GN - 1, Math.max(0, Math.round(s.x / GS))), j = Math.min(GN - 1, Math.max(0, Math.round(s.y / GS)));
+    return S.ll[j * GN + i] - S.ll[S.best] > -regFor(P.mode);
+  }
+
+  // os três estimadores sobre os mesmos dados
+  function compareEstimators() {
+    if (S.M < 10) return;
+    S.cmp = ["total", "peak", "peak_ref"].map(mode => {
+      const A = new Float64Array(NPT).fill(1e7), b = new Float64Array(NPT), ll = new Float64Array(NPT);
+      fitGrid(mode, A, b, ll, 12);
+      const r = fitGrid(mode, A, b, ll, 30), thr = thrFor(P.nuc, mode);
+      return { mode, x: CX[r.best], y: CY[r.best], A: r.A, unc: r.unc, D: r.D, thr,
+        det: r.D > (thr ?? 10), err: errXY(CX[r.best], CY[r.best]) };
+    });
+  }
+
+  // ---------- desenho ----------
+  let C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ["panel", "ink", "muted", "line", "field", "grid", "accent", "ok", "warn", "path", "win", "ref", "e1", "e2", "e3", "s4", "s5", "s6"]) C[k] = cs.getPropertyValue("--" + k).trim();
+  }
+  const STOPS = [[42, 60, 90], [90, 70, 160], [200, 70, 90], [245, 160, 40], [255, 235, 140]];
+  function cmap(t) {
+    t = Math.min(1, Math.max(0, t)) * (STOPS.length - 1);
+    const i = Math.min(STOPS.length - 2, Math.floor(t)), f = t - i, a = STOPS[i], c = STOPS[i + 1];
+    return `rgb(${a[0] + (c[0] - a[0]) * f | 0},${a[1] + (c[1] - a[1]) * f | 0},${a[2] + (c[2] - a[2]) * f | 0})`;
+  }
+  function fit(cv) {
+    const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    const w = Math.max(10, Math.round(r.width * d)), h = Math.max(10, Math.round(r.height * d));
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const ctx = cv.getContext("2d"); ctx.setTransform(d, 0, 0, d, 0, 0);
+    return { ctx, w: r.width, h: r.height };
+  }
+  const map = $("map"), PAD = { l: 30, r: 8, t: 8, b: 26 };
+  function mapGeom() {
+    const r = map.getBoundingClientRect();
+    const size = Math.min(r.width - PAD.l - PAD.r, r.height - PAD.t - PAD.b);
+    return { k: size / FIELD, ox: PAD.l, oy: PAD.t + size };
+  }
+  let bgImg = null, bgImgKey = "";
+  function bgImage() {
+    const key = bgSeed + ":" + P.bvar + ":" + C.field;
+    if (bgImg && bgImgKey === key) return bgImg;
+    const cv = document.createElement("canvas"); cv.width = BN; cv.height = BN;
+    const ctx = cv.getContext("2d"), im = ctx.createImageData(BN, BN);
+    for (let j = 0; j < BN; j++) for (let i = 0; i < BN; i++) {
+      const v = Math.max(-2.5, Math.min(2.5, BGF[j * BN + i])) / 2.5, o = ((BN - 1 - j) * BN + i) * 4;
+      im.data[o] = v > 0 ? 200 : 90; im.data[o + 1] = v > 0 ? 120 : 130; im.data[o + 2] = v > 0 ? 70 : 200; im.data[o + 3] = Math.abs(v) * 110;
+    }
+    ctx.putImageData(im, 0, 0); bgImg = cv; bgImgKey = key; return cv;
+  }
+  // relevo: sombreado (mais claro = mais alto) com curvas de nível a cada 0,5 m
+  let terKey = "";
+  function terImage() {
+    const key = bgSeed + ":" + P.rel + ":" + FIELD + ":" + C.field;
+    if (terImg && terKey === key) return terImg;
+    const NB = 121, cv = document.createElement("canvas"); cv.width = NB; cv.height = NB;
+    const ctx = cv.getContext("2d"), im = ctx.createImageData(NB, NB), dark = C.ink && C.ink.startsWith("#e");
+    for (let j = 0; j < NB; j++) for (let i = 0; i < NB; i++) {
+      const x = i / (NB - 1) * FIELD, y = j / (NB - 1) * FIELD, g = ground(x, y), o = ((NB - 1 - j) * NB + i) * 4;
+      const v = Math.max(-1, Math.min(1, g / (2.5 * P.rel))), fr = Math.abs(g / 0.5 - Math.round(g / 0.5));
+      const line = fr < 0.06 ? 1 : 0;
+      im.data[o] = line ? (dark ? 230 : 70) : 150 + 60 * v; im.data[o + 1] = line ? (dark ? 230 : 70) : 135 + 50 * v; im.data[o + 2] = line ? (dark ? 230 : 70) : 95 + 30 * v;
+      im.data[o + 3] = line ? 120 : 40 + 50 * Math.abs(v);
+    }
+    ctx.putImageData(im, 0, 0); terImg = cv; terKey = key; return cv;
+  }
+  // mapa contínuo das contagens: suavização gaussiana (Nadaraya–Watson) das medidas
+  let interpImg = null;
+  function interpImage() {
+    const N = S.used.length;
+    if (interpImg && S.interpKey === N) return interpImg;
+    const NB = 101, cs = FIELD / (NB - 1);
+    const sig = Math.max(P.s * 0.6, FIELD / 25), R = Math.ceil(2.5 * sig / cs), num = new Float64Array(NB * NB), den = new Float64Array(NB * NB);
+    for (let k = 0; k < N; k++) {
+      const x0 = Math.round(S.mx[k] / cs), y0 = Math.round(S.my[k] / cs);
+      for (let j = Math.max(0, y0 - R); j <= Math.min(NB - 1, y0 + R); j++)
+        for (let i = Math.max(0, x0 - R); i <= Math.min(NB - 1, x0 + R); i++) {
+          const w = Math.exp(-((i * cs - S.mx[k]) ** 2 + (j * cs - S.my[k]) ** 2) / (2 * sig * sig));
+          num[j * NB + i] += w * S.used[k] / DT; den[j * NB + i] += w;
+        }
+    }
+    let vmax = 1e-9; const val = new Float64Array(NB * NB);
+    for (let q = 0; q < val.length; q++) { val[q] = den[q] > 0.05 ? num[q] / den[q] : NaN; if (val[q] > vmax) vmax = val[q]; }
+    const cv = document.createElement("canvas"); cv.width = NB; cv.height = NB;
+    const cx = cv.getContext("2d"), im = cx.createImageData(NB, NB), lm = Math.log(vmax + 1);
+    for (let j = 0; j < NB; j++) for (let i = 0; i < NB; i++) {
+      const v = val[j * NB + i], o = ((NB - 1 - j) * NB + i) * 4;
+      if (!(v >= 0)) continue;
+      const m = cmap(Math.log(v + 1) / lm).match(/\d+/g);
+      im.data[o] = +m[0]; im.data[o + 1] = +m[1]; im.data[o + 2] = +m[2]; im.data[o + 3] = 235;
+    }
+    cx.putImageData(im, 0, 0); interpImg = cv; S.interpKey = N; return cv;
+  }
+
+  function drawMap() {
+    const { ctx, w, h } = fit(map), g = mapGeom(), X = x => g.ox + x * g.k, Y = y => g.oy - y * g.k, sz = FIELD * g.k;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = C.field; ctx.fillRect(X(0), Y(FIELD), sz, sz);
+    if ($("showBg").checked && P.bvar > 0) { ctx.imageSmoothingEnabled = true; ctx.drawImage(bgImage(), X(0), Y(FIELD), sz, sz); }
+    if (P.rel > 0) { ctx.imageSmoothingEnabled = true; ctx.drawImage(terImage(), X(0), Y(FIELD), sz, sz); }
+    const thr = thrFor(P.nuc, P.mode) ?? 10;
+    if ($("showLL").checked && S.best >= 0 && S.D > thr) {
+      const top = S.ll[S.best];
+      for (let p = 0; p < NPT; p++) {
+        const d = S.ll[p] - top; if (d < -12) continue;
+        ctx.fillStyle = C.ok; ctx.globalAlpha = 0.55 * Math.exp(d / 4);
+        ctx.fillRect(X(CX[p] - GS / 2), Y(CY[p] + GS / 2), GS * g.k + 0.5, GS * g.k + 0.5);
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.fillStyle = C.muted;
+    ctx.font = "11px 'JetBrains Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const tk = niceMax(FIELD / 5);
+    for (let v = 0; v <= FIELD + 1e-9; v += tk / 2) {
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath(); ctx.moveTo(X(v) + 0.5, Y(0)); ctx.lineTo(X(v) + 0.5, Y(FIELD)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(X(0), Y(v) + 0.5); ctx.lineTo(X(FIELD), Y(v) + 0.5); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    for (let v = 0; v <= FIELD + 1e-9; v += tk) ctx.fillText(+v.toFixed(1), X(v), Y(0) + 6);
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let v = 0; v <= FIELD + 1e-9; v += tk) ctx.fillText(+v.toFixed(1), X(0) - 5, Y(v));
+    const route = P.strat === "draw" ? drawPts : S.plan;
+    if (route && route.length > 1) {
+      ctx.strokeStyle = C.muted; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.2; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); route.forEach(([x, y], i) => i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+    if (P.strat === "draw") {
+      ctx.fillStyle = C.ink;
+      drawPts.forEach(([x, y], i) => { ctx.beginPath(); ctx.arc(X(x), Y(y), i ? 3 : 4.5, 0, 7); ctx.fill(); });
+    }
+    if (S.tx.length) {
+      ctx.strokeStyle = C.path; ctx.globalAlpha = 0.35; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(S.tx[0]), Y(S.ty[0]));
+      for (let i = 1; i < S.tx.length; i++) ctx.lineTo(X(S.tx[i]), Y(S.ty[i]));
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    let vmax = 1; for (const v of S.used) vmax = Math.max(vmax, v);
+    const lmax = Math.log(vmax / DT + 1), rad = Math.max(2, Math.min(4.5, g.k * 1.3));
+    if ($("mapView").value === "interp" && S.used.length > 3) {
+      ctx.imageSmoothingEnabled = true; ctx.drawImage(interpImage(), X(0), Y(FIELD), sz, sz);
+    } else for (let i = 0; i < S.used.length; i++) {
+      ctx.fillStyle = cmap(Math.log(S.used[i] / DT + 1) / lmax);
+      ctx.beginPath(); ctx.arc(X(S.mx[i]), Y(S.my[i]), rad, 0, 7); ctx.fill();
+    }
+    if ($("showSrc").checked) {
+      star(ctx, X(src.x), Y(src.y), 9, C.accent, C.ink);
+      if (P.src2) {
+        star(ctx, X(src2.x), Y(src2.y), 5 + 4 * Math.min(1, Math.sqrt(P.r2)), C.ref, C.ink);
+        ctx.fillStyle = C.ink; ctx.font = "10px 'JetBrains Mono', monospace"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillText("2", X(src2.x) + 9, Y(src2.y) - 8);
+      }
+    }
+    if (S.best >= 0 && S.D > thr) {
+      const ex = X(CX[S.best]), ey = Y(CY[S.best]);
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(ex, ey, Math.max(6, S.unc * g.k), 0, 7); ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(ex - 8, ey); ctx.lineTo(ex + 8, ey); ctx.moveTo(ex, ey - 8); ctx.lineTo(ex, ey + 8); ctx.stroke();
+    }
+    if ($("showDose").checked && PR) {
+      // curvas de mesma taxa de dose na altura de voo (fonte pontual: círculos)
+      ctx.font = "10px 'JetBrains Mono', monospace"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+      for (let e = -3; e <= 4; e++) {
+        const lev = Math.pow(10, e);
+        if (doseRate(P.A, 0, P.h) < lev) continue;
+        let lo = 0, hi = FIELD * 3;
+        if (doseRate(P.A, hi, P.h) > lev) continue;
+        for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; doseRate(P.A, m, P.h) > lev ? lo = m : hi = m; }
+        const R = lo * g.k;
+        if (R < 3) continue;
+        ctx.strokeStyle = C.warn; ctx.globalAlpha = 0.75; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+        ctx.beginPath(); ctx.arc(X(src.x), Y(src.y), R, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = C.warn; ctx.globalAlpha = 1;
+        const a = -Math.PI / 4, lx = X(src.x) + R * Math.cos(a) + 2, ly = Y(src.y) + R * Math.sin(a);
+        if (lx > X(0) && lx < X(FIELD) - 50 && ly > Y(FIELD) + 10 && ly < Y(0)) ctx.fillText(lev < 1 ? lev * 1000 + " nSv/h" : lev < 1000 ? lev + " µSv/h" : lev / 1000 + " mSv/h", lx, ly);
+      }
+      ctx.globalAlpha = 1;
+    }
+    drone(ctx, X(S.x), Y(S.y));
+    ctx.strokeStyle = C.line; ctx.strokeRect(X(0) + 0.5, Y(FIELD) + 0.5, sz - 1, sz - 1);
+  }
+  function star(ctx, x, y, r, fill, stroke) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a)); }
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke();
+  }
+  function drone(ctx, x, y) {
+    ctx.strokeStyle = C.ink; ctx.fillStyle = C.panel; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x - 7, y - 7); ctx.lineTo(x + 7, y + 7); ctx.moveTo(x + 7, y - 7); ctx.lineTo(x - 7, y + 7); ctx.stroke();
+    for (const [a, b] of [[-7, -7], [7, -7], [-7, 7], [7, 7]]) { ctx.beginPath(); ctx.arc(x + a, y + b, 3.6, 0, 7); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill();
+  }
+  function axes(ctx, w, h, pad) {
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.l + 0.5, pad.t); ctx.lineTo(pad.l + 0.5, h - pad.b + 0.5); ctx.lineTo(w - pad.r, h - pad.b + 0.5); ctx.stroke();
+    ctx.fillStyle = C.muted; ctx.font = "10.5px 'JetBrains Mono', monospace";
+  }
+  function niceMax(v) { const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p; return 10 * p; }
+  const fmtT = t => { t = Math.round(t); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); };
+  const fmtM = d => d < 1 ? Math.round(d * 100) + " cm" : d.toFixed(1) + " m";
+
+  function specWindow() {
+    const N = S.used.length;
+    if (S.done && N >= 5) {
+      let best = 0, bs = -1;
+      for (let i = 0; i + 5 <= N; i++) { let a = 0; for (let j = i; j < i + 5; j++) a += S.used[j]; if (a > bs) { bs = a; best = i; } }
+      return { spectra: S.specs.slice(best, best + 5), idx: [best, best + 5],
+        label: `Espectro dos 5 s mais intensos do voo (${fmtT(best * DT)} a ${fmtT((best + 5) * DT)})` };
+    }
+    return { spectra: S.win, idx: [Math.max(0, N - 5), N], label: "Espectro dos últimos 5 s" };
+  }
+
+  // espectro somado conforme a escolha (voo inteiro, 5 s mais intensos, últimos 5 s) e background esperado
+  function specSum(kind) {
+    const N = S.specs.length;
+    let i0 = 0, i1 = N, pick = null, R = 0;
+    if (kind === "near" && N) {
+      // centro: posição estimada se houver detecção; senão o ponto mais intenso do voo
+      let cx, cy;
+      if (S.best >= 0 && S.D > (thrFor(P.nuc, P.mode) ?? 10)) { cx = CX[S.best]; cy = CY[S.best]; }
+      else { let b = 0; for (let i = 1; i < N; i++) if (S.used[i] > S.used[b]) b = i; cx = S.mx[b]; cy = S.my[b]; }
+      R = Math.max(P.h, FIELD * 0.1);
+      pick = []; for (let i = 0; i < N; i++) if (Math.hypot(S.mx[i] - cx, S.my[i] - cy) <= R) pick.push(i);
+    }
+    if (kind === "last") i0 = Math.max(0, N - 5);
+    else if (kind === "best" && N >= 5) {
+      let bs = -1;
+      for (let i = 0; i + 5 <= N; i++) { let a = 0; for (let j = i; j < i + 5; j++) a += S.used[j]; if (a > bs) { bs = a; i0 = i; } }
+      i1 = i0 + 5;
+    }
+    const sum = new Float64Array(NCH), bg = new Float64Array(NCH);
+    let bsum = 0;
+    const idx = pick ?? Array.from({ length: i1 - i0 }, (_, k) => i0 + k);
+    for (const j of idx) { const sp = S.specs[j]; for (let i = 0; i < NCH; i++) sum[i] += sp[i]; bsum += S.bgTrue[j] * DT; }
+    for (let i = 0; i < NCH; i++) bg[i] = bsum * BG[i];
+    return { sum, bg, i0, i1, n: idx.length, R, near: !!pick };
+  }
+
+  function fillLines() {
+    const sel = $("pkLine"), keep = sel.value;
+    const opts = PR.lines.filter(l => l.Y >= 0.10 && l.E > PHYS.THR + 10);
+    sel.innerHTML = opts.map(l => `<option value="${l.E}">${l.E.toFixed(1)} keV (${(l.Y * 100).toFixed(0)}%)</option>`).join("");
+    if (opts.some(l => String(l.E) === keep)) sel.value = keep;
+  }
+
+  function drawPeak() {
+    const cv = $("peakChart"), { ctx, w, h } = fit(cv), pad = { l: 52, r: 12, t: 10, b: 30 };
+    ctx.clearRect(0, 0, w, h); axes(ctx, w, h, pad);
+    const E0 = +$("pkLine").value || PR.lines[0].E, f = PHYS.fwhm(E0);
+    const lo = Math.max(PHYS.THR, E0 - Math.max(8 * f, 0.25 * E0)), hi = E0 + 6 * f;
+    const { sum, bg, i0, i1, n: nSec, R, near } = specSum($("pkSrc").value);
+    const de = EMAX / NCH, c0 = Math.max(0, Math.floor(lo / de)), c1 = Math.min(NCH - 1, Math.ceil(hi / de));
+    // janela desta linha: [E − 3 FWHM, E + 1,5 FWHM]
+    const inWin = i => AX[i] >= E0 - 3 * f && AX[i] <= E0 + 1.5 * f;
+    let ymax = 1;
+    for (let i = c0; i <= c1; i++) ymax = Math.max(ymax, sum[i], bg[i]);
+    ymax = niceMax(ymax * 1.1);
+    const X = E => pad.l + (E - lo) / (hi - lo) * (w - pad.l - pad.r), Y = v => h - pad.b - v / ymax * (h - pad.t - pad.b);
+    // grade e eixos
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let k = 0; k <= 4; k++) {
+      const v = ymax * k / 4; ctx.fillText(+v.toFixed(1), pad.l - 6, Y(v));
+      ctx.strokeStyle = C.grid; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.moveTo(pad.l, Y(v) + 0.5); ctx.lineTo(w - pad.r, Y(v) + 0.5); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const st = niceMax((hi - lo) / 6);
+    for (let E = Math.ceil(lo / st) * st; E <= hi; E += st) ctx.fillText(Math.round(E), X(E), h - pad.b + 6);
+    ctx.fillText("Energia (keV)", (pad.l + w - pad.r) / 2, h - 13);
+    ctx.save(); ctx.translate(13, (pad.t + h - pad.b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("contagens / canal", 0, -4); ctx.restore();
+    const sm = i => (sum[Math.max(0, i - 1)] + 2 * sum[i] + sum[Math.min(NCH - 1, i + 1)]) / 4;
+    const pts = []; for (let i = c0; i <= c1; i++) pts.push([X(AX[i]), Y(sm(i)), i]);
+    // preenchimento suave sob o espectro
+    ctx.beginPath(); ctx.moveTo(pts[0][0], Y(0));
+    for (const [x, y] of pts) ctx.lineTo(x, y);
+    ctx.lineTo(pts[pts.length - 1][0], Y(0)); ctx.closePath();
+    ctx.fillStyle = C.ink; ctx.globalAlpha = 0.07; ctx.fill(); ctx.globalAlpha = 1;
+    // contagens líquidas na janela: área entre o espectro e o background
+    const wi = pts.filter(p => inWin(p[2]));
+    if (wi.length > 1) {
+      ctx.beginPath(); ctx.moveTo(wi[0][0], Y(bg[wi[0][2]]));
+      for (const [x, y, i] of wi) ctx.lineTo(x, Math.min(y, Y(bg[i])));
+      for (let k = wi.length - 1; k >= 0; k--) ctx.lineTo(wi[k][0], Y(bg[wi[k][2]]));
+      ctx.closePath(); ctx.fillStyle = C.win; ctx.globalAlpha = 0.32; ctx.fill(); ctx.globalAlpha = 1;
+    }
+    // energia nominal
+    ctx.strokeStyle = C.win; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(X(E0) + 0.5, pad.t); ctx.lineTo(X(E0) + 0.5, h - pad.b); ctx.stroke();
+    // background esperado
+    ctx.strokeStyle = C.muted; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let i = c0; i <= c1; i++) { const x = X(AX[i]), y = Y(bg[i]); i === c0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+    ctx.stroke(); ctx.setLineDash([]);
+    // espectro simulado como curva contínua
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.4; ctx.lineJoin = "round"; ctx.beginPath();
+    pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+    // forma do pico ajustada (gaussiana + cauda do CZT) sobre o background
+    const L = PR.lines.find(l => l.E === E0);
+    if (L) {
+      let netW = 0, shW = 0;
+      for (let i = 0; i < NCH; i++) if (inWin(i)) { netW += sum[i] - bg[i]; shW += L.shape[i]; }
+      if (netW > 0 && shW > 0) {
+        const amp = netW / shW;
+        ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.beginPath();
+        for (let i = c0; i <= c1; i++) { const x = X(AX[i]), y = Y(bg[i] + amp * L.shape[i]); i === c0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+        ctx.stroke();
+      }
+    }
+    // estatísticas do pico
+    let gross = 0, bsum = 0, num = 0, den = 0;
+    for (let i = 0; i < NCH; i++) if (inWin(i)) {
+      gross += sum[i]; bsum += bg[i];
+      if (Math.abs(AX[i] - E0) <= f) { const n = sum[i] - bg[i]; num += n * AX[i]; den += n; }
+    }
+    const net = gross - bsum, sig = Math.sqrt(gross + bsum), z = net / Math.sqrt(Math.max(bsum, 1));
+    const secs = nSec * DT;
+    const when = near ? ` (até ${R} m da fonte)` : (nSec < S.specs.length ? ` (${fmtT(i0 * DT)} a ${fmtT(i1 * DT)})` : "");
+    const rows = [
+      ["Tempo de medida", secs ? (secs < 60 ? secs + " s" : fmtT(secs)) + when : "—"],
+      ["Contagens na janela", gross ? gross.toFixed(0) : "0"],
+      ["Background esperado na janela", bsum.toFixed(1)],
+      ["Contagens líquidas", `${net.toFixed(0)} ± ${sig.toFixed(0)}`],
+      ["Significância", isFinite(z) ? z.toFixed(1) + " σ" : "—"],
+      ["Centroide (± 1 FWHM)", den > 5 ? (num / den).toFixed(1) + " keV" : "—"],
+      ["Resolução do detector", `${f.toFixed(1)} keV (${(100 * f / E0).toFixed(2)}%)`]
+    ];
+    $("peakStats").innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+  }
+
+  // energia máxima mostrada na cascata
+  const wfEmax = () => Math.min(2000, Math.max(800, Math.max(...PR.lines.map(l => l.E)) * 1.2));
+
+  // cascata de espectros (energia × tempo) + contagens na janela com o modelo ajustado
+  function drawWaterfall() {
+    const cv = $("wfChart"); if (!cv) return;
+    const { ctx, w, h } = fit(cv);
+    ctx.clearRect(0, 0, w, h);
+    const N = S.specs.length, pad = { t: 10, b: 34, l: 44 }, gap = 18, pw = Math.min(190, w * 0.3);
+    const wx0 = pad.l, wx1 = w - pw - gap - 8, px0 = wx1 + gap, px1 = w - 10, y0 = pad.t, y1 = h - pad.b;
+    ctx.fillStyle = C.muted; ctx.font = "10.5px 'JetBrains Mono', monospace";
+    if (N < 2) return;
+    const tmax = Math.max(60, N * DT), Y = t => y0 + t / tmax * (y1 - y0);
+    // imagem: energia em bins de 8 keV, tempo por segundo
+    const Em = wfEmax(), eb = Math.max(12, Math.round(PHYS.fwhm(662) * 1.5)), nE = Math.ceil(Em / eb), tb = Math.max(2, Math.ceil(N / 200)), nR = Math.ceil(N / tb);
+    const img = new Float32Array(nE * nR), mean = new Float64Array(nE);
+    for (let r = 0; r < N; r++) {
+      const sp = S.specs[r], row = r / tb | 0;
+      for (let i = 0; i < NCH; i++) { const E = AX[i]; if (E >= Em) break; const k = E / eb | 0; img[row * nE + k] += sp[i]; mean[k] += sp[i]; }
+    }
+    for (let k = 0; k < nE; k++) mean[k] = mean[k] / N * tb;  // contagens médias por linha de tb segundos
+    const off = document.createElement("canvas"); off.width = nE; off.height = nR;
+    const oc = off.getContext("2d"), im = oc.createImageData(nE, nR);
+    for (let r = 0; r < nR; r++) for (let k = 0; k < nE; k++) {
+      const q = r * nE + k, frac = Math.min(1, (N - r * tb) / tb), m0 = mean[k] * frac;
+      const z = (img[q] - m0) / Math.sqrt(Math.max(m0, 0.5));
+      const m = cmap(Math.max(0, z - 1.5) / 4).match(/\d+/g), o = q * 4;
+      im.data[o] = +m[0]; im.data[o + 1] = +m[1]; im.data[o + 2] = +m[2]; im.data[o + 3] = 255;
+    }
+    oc.putImageData(im, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, wx0, y0, wx1 - wx0, Y(nR * tb * DT) - y0);
+    const XE = E => wx0 + E / Em * (wx1 - wx0);
+    // linhas do radionuclídeo
+    ctx.strokeStyle = C.win; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    for (const l of PR.lines) if (l.Y >= 0.10 && l.E > PHYS.THR + 10 && l.E < Em) { ctx.beginPath(); ctx.moveTo(XE(l.E) + 0.5, y0); ctx.lineTo(XE(l.E) + 0.5, y1); ctx.stroke(); }
+    ctx.setLineDash([]);
+    // eixos da cascata
+    ctx.strokeStyle = C.line; ctx.strokeRect(wx0 + 0.5, y0 + 0.5, wx1 - wx0, y1 - y0);
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const es = niceMax(Em / 5);
+    for (let E = 0; E <= Em; E += es) ctx.fillText(E, XE(E), y1 + 5);
+    ctx.fillText("Energia (keV)", (wx0 + wx1) / 2, y1 + 19);
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    const ts = niceMax(tmax / 6);
+    for (let t = 0; t <= tmax; t += ts) ctx.fillText(fmtT(t), wx0 - 6, Y(t));
+    // painel do perfil: contagens usadas e modelo ajustado no mesmo eixo de tempo
+    const { G, s } = modeData(P.mode), b = S.best;
+    const model = new Float64Array(N);
+    if (b >= 0 && S.bArr) for (let i = 0; i < Math.min(N, S.M); i++) model[i] = S.Aest[b] * G[b * S.cap + i] + S.bArr[b] * (s ? s[i] : 1);
+    let vmax = 2; for (let i = 0; i < N; i++) vmax = Math.max(vmax, S.used[i], model[i]);
+    vmax = niceMax(vmax);
+    const XP = v => px0 + v / vmax * (px1 - px0);
+    ctx.strokeStyle = C.grid; ctx.globalAlpha = 0.6;
+    for (let k = 0; k <= 2; k++) { const x = XP(vmax * k / 2) + 0.5; ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(px0 + 0.5, y0); ctx.lineTo(px0 + 0.5, y1); ctx.stroke();
+    ctx.strokeStyle = C.ink; ctx.globalAlpha = 0.55; ctx.lineWidth = 1; ctx.beginPath();
+    for (let i = 0; i < N; i++) { const x = XP(S.used[i]), y = Y((i + 0.5) * DT); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke(); ctx.globalAlpha = 1;
+    if (b >= 0) {
+      ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = 0; i < Math.min(N, S.M); i++) { const x = XP(model[i]), y = Y((i + 0.5) * DT); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = C.muted;
+    for (let k = 0; k <= 2; k++) ctx.fillText(+(vmax * k / 2).toFixed(1), XP(vmax * k / 2), y1 + 5);
+    ctx.fillText("contagens/s", (px0 + px1) / 2, y1 + 19);
+  }
+
+  // convergência: erro de localização e raio de incerteza ao longo do voo
+  function drawConv() {
+    const cv = $("convChart"); if (!cv) return;
+    const { ctx, w, h } = fit(cv), pad = { l: 40, r: 10, t: 10, b: 34 };
+    ctx.clearRect(0, 0, w, h); axes(ctx, w, h, pad);
+    const H = S.hist, tmax = Math.max(60, S.t);
+    let ym = 5; for (const q of H) if (q.det) ym = Math.max(ym, Math.min(q.err, 40), Math.min(q.unc, 40));
+    ym = niceMax(ym);
+    const X = t => pad.l + t / tmax * (w - pad.l - pad.r), Y = v => h - pad.b - Math.min(v, ym) / ym * (h - pad.t - pad.b);
+    if (S.firstDet === null || S.firstDet > 0) {
+      const xe = S.firstDet === null ? X(S.t) : X(S.firstDet);
+      ctx.fillStyle = C.grid; ctx.globalAlpha = 0.35; ctx.fillRect(pad.l + 1, pad.t, xe - pad.l - 1, h - pad.b - pad.t); ctx.globalAlpha = 1;
+      ctx.fillStyle = C.muted; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      if (xe - pad.l > 90) ctx.fillText("sem detecção", pad.l + 6, pad.t + 4);
+    }
+    ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillStyle = C.muted;
+    for (let k = 0; k <= 4; k++) {
+      const v = ym * k / 4; ctx.fillText(+v.toFixed(1), pad.l - 6, Y(v));
+      ctx.strokeStyle = C.grid; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.moveTo(pad.l, Y(v) + 0.5); ctx.lineTo(w - pad.r, Y(v) + 0.5); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const ts = niceMax(tmax / 5); for (let t = 0; t <= tmax; t += ts) ctx.fillText(fmtT(t), X(t), h - pad.b + 5);
+    ctx.fillText("Tempo de voo", (pad.l + w - pad.r) / 2, h - pad.b + 19);
+    const D = H.filter(q => q.det);
+    const line = (key, col, dash, lw) => {
+      ctx.strokeStyle = col; ctx.setLineDash(dash); ctx.lineWidth = lw; ctx.beginPath();
+      D.forEach((q, k) => { const x = X(q.t), y = Y(q[key]); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]);
+    };
+    if (D.length) {
+      line("unc", C.muted, [5, 4], 1.4);
+      line("err", C.accent, [], 2);
+      const q = D[D.length - 1];
+      ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(X(q.t), Y(q.err), 3.5, 0, 7); ctx.fill();
+    }
+  }
+
+  // comparação dos três estimadores no mesmo voo
+  const EST = { total: "Contagem total", peak: "Janela do fotopico", peak_ref: "Janela + background local" };
+  function drawCompare() {
+    const cv = $("cmpMap"), { ctx, w, h } = fit(cv);
+    ctx.clearRect(0, 0, w, h);
+    const m = 22, size = Math.min(w, h) - m - 6, X = x => m + x / FIELD * size, Y = y => 6 + size - y / FIELD * size;
+    ctx.fillStyle = C.field; ctx.fillRect(X(0), Y(FIELD), size, size);
+    if ($("showBg").checked && P.bvar > 0) { ctx.imageSmoothingEnabled = true; ctx.drawImage(bgImage(), X(0), Y(FIELD), size, size); }
+    ctx.strokeStyle = C.line; ctx.strokeRect(X(0) + 0.5, Y(FIELD) + 0.5, size - 1, size - 1);
+    ctx.fillStyle = C.muted; ctx.font = "10px 'JetBrains Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let v = 0; v <= FIELD; v += FIELD / 2) ctx.fillText(v, X(v), Y(0) + 3);
+    ctx.textAlign = "right"; ctx.textBaseline = "middle"; for (let v = 0; v <= FIELD; v += FIELD / 2) ctx.fillText(v, X(0) - 4, Y(v));
+    star(ctx, X(src.x), Y(src.y), 8, C.accent, C.ink);
+    if (P.src2) star(ctx, X(src2.x), Y(src2.y), 6, C.ref, C.ink);
+    const tb = $("cmpTable");
+    if (!S.cmp) {
+      tb.innerHTML = `<tr><td colspan="4" class="muted">${S.done ? "Voo curto demais para comparar." : "A comparação aparece no fim do voo, ou clique em “Comparar agora”."}</td></tr>`;
+      return;
+    }
+    const cols = { total: C.e1, peak: C.e2, peak_ref: C.e3 };
+    for (const r of S.cmp) {
+      ctx.strokeStyle = cols[r.mode]; ctx.fillStyle = cols[r.mode]; ctx.lineWidth = 2;
+      if (r.det) {
+        ctx.globalAlpha = 0.15; ctx.beginPath(); ctx.arc(X(r.x), Y(r.y), Math.max(4, r.unc / FIELD * size), 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+        ctx.beginPath(); ctx.arc(X(r.x), Y(r.y), Math.max(4, r.unc / FIELD * size), 0, 7); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(X(r.x), Y(r.y), 4.5, 0, 7); r.det ? ctx.fill() : ctx.stroke();
+    }
+    tb.innerHTML = S.cmp.map(r => `<tr>
+      <td><span class="swatch" style="background:${cols[r.mode]}"></span>${EST[r.mode]}</td>
+      <td>${r.det ? `(${r.x.toFixed(1)}, ${r.y.toFixed(1)})` : "—"}</td>
+      <td>${r.det ? fmtM(r.err) : "—"}</td>
+      <td>${r.det ? "detectou" : "não detectou"}</td></tr>`).join("");
+  }
+
+  // identificação simples por janelas (marcador de lugar para a RNA / Random Forest)
+  function identify() {
+    const sw = specWindow();
+    if (sw.spectra.length < 5) return null;
+    const sum = new Float64Array(NCH); for (const s of sw.spectra) for (let i = 0; i < NCH; i++) sum[i] += s[i];
+    const bgMean = S.bgTrue.slice(sw.idx[0], sw.idx[1]).reduce((a, b) => a + b, 0);
+    let best = null, bz = 3;
+    for (const n in NUCLIDES) {
+      const pr = prep(n); let obs = 0;
+      for (let i = 0; i < NCH; i++) if (pr.peakMask[i]) obs += sum[i];
+      const exp = bgMean * bgFrac(pr.peakMask), z = (obs - exp) / Math.sqrt(Math.max(exp, 1));
+      if (z > bz) { bz = z; best = n; }
+    }
+    return best ? { n: best, z: bz } : null;
+  }
+
+  function updateReadouts() {
+    const thr = thrFor(P.nuc, P.mode);
+    const thrUse = thr ?? 10, det = S.D > thrUse;
+    $("rTime").textContent = fmtT(S.t);
+    $("rDose").textContent = fmtDose(S.doseNow); $("rDoseMax").textContent = fmtDose(S.doseMax);
+    $("rDose1").textContent = fmtDose(doseRate(P.A, 0, 1, 0));
+    if (CAL[calKey] && CAL[calKey][P.mode] != null) $("rThr").textContent = `${CAL[calKey][P.mode].toFixed(1)} (calibrado com 200 voos sem fonte)`;
+    else if (!/calibrando/.test($("rThr").textContent)) $("rThr").textContent = "calibrando…";
+    $("rDist").textContent = Math.round(S.dist) + " m";
+    $("rCps").textContent = (S.used.length ? S.used[S.used.length - 1] : 0) + " cps";
+    $("rBg").textContent = (P.mode === "total" ? P.b : P.b * wfB).toFixed(P.mode === "total" ? 0 : 2) + " cps";
+    if (det) {
+      const b = S.best;
+      $("rEst").textContent = `(${CX[b].toFixed(1)}, ${CY[b].toFixed(1)}) m`;
+      $("rA").textContent = fmtA(S.Aest[b]);
+      $("rUnc").textContent = "± " + fmtM(S.unc);
+      const e1 = Math.hypot(CX[b] - src.x, CY[b] - src.y), e2 = P.src2 ? Math.hypot(CX[b] - src2.x, CY[b] - src2.y) : Infinity;
+      $("rErr").textContent = fmtM(Math.min(e1, e2)) + (P.src2 ? (e2 < e1 ? " (fonte 2)" : " (fonte 1)") : "");
+      const cov = covered();
+      $("rCov").textContent = cov ? "sim" : "não";
+      $("rCov").style.color = cov ? C.ok : C.warn;
+    } else { for (const id of ["rEst", "rA", "rUnc", "rErr", "rCov"]) $(id).textContent = "—"; $("rCov").style.color = ""; }
+    const rk = REG[regKey()];
+    $("rReg").textContent = rk && rk[P.mode] ? `ΔlnL ≤ ${rk[P.mode].toFixed(1)} (calibrado com ${rk.n} voos com fonte)`
+      : (rk && rk.msg) || "calibrando…";
+    $("rPerf").textContent = `${S.perf.step.toFixed(2)} ms por espectro · ${S.perf.est.toFixed(0)} ms por localização (${NPT.toLocaleString("pt-BR")} pontos × ${S.M} espectros)`;
+    const id = identify();
+    $("idLabel").textContent = S.done ? "Identificação (5 s mais intensos)" : "Identificação (últimos 5 s)";
+    $("rId").textContent = id ? `${id.n} (${id.z.toFixed(0)}σ)` : (S.done ? "inconclusiva" : "sem sinal agora");
+    $("rId").style.color = id ? (id.n === P.nuc ? C.ok : C.warn) : "";
+    const ph = $("phase"), st = $("statusTxt");
+    if (S.waiting) { ph.className = "pill idle"; ph.textContent = "Desenho"; st.textContent = "Marque pelo menos 2 pontos no mapa e clique em “Voar esta trajetória”"; }
+    else if (S.done) { ph.className = "pill ok"; ph.textContent = "Concluído"; st.textContent = det ? "Fonte localizada" : "Nenhuma fonte acima do limiar"; }
+    else if (P.strat === "pilot") { ph.className = det ? "pill det" : "pill idle"; ph.textContent = "Piloto"; st.textContent = (S.dir[0] || S.dir[1]) ? (det ? "Fonte detectada" : "Voo manual") : "Pairando (detector medindo)"; }
+    else if (S.phase === "espiral") { ph.className = "pill det"; ph.textContent = "Espiral"; st.textContent = "Refinando em torno da estimativa"; }
+    else if (S.phase === "retorno") { ph.className = "pill det"; ph.textContent = "Retorno"; st.textContent = "Indo para a posição estimada"; }
+    else { ph.className = det ? "pill det" : "pill idle"; ph.textContent = "Busca"; st.textContent = det ? "Fonte detectada, continuando a varredura" : "Varrendo o campo"; }
+    if (S.maxRate > 25000) st.textContent += ` · atenção: taxa de ${Math.round(S.maxRate / 1000)} mil cps, acima do máximo do detector (25 mil cps); na prática o M400 saturaria`;
+    else if (S.maxRate > 5000) st.textContent += ` · tempo morto de até ${Math.round(100 * (1 - 1 / (1 + S.maxRate * TAU_DEAD)))}%`;
+  }
+
+  function drawAll() { drawMap(); drawPeak(); drawWaterfall(); drawConv(); drawCompare(); updateReadouts(); }
+
+  // ---------- comparação dos tipos de varredura (muitos voos rápidos) ----------
+  const PAT_NAMES = { lines: "Linhas paralelas", zigzag: "Zigue-zague", spiral: "Espiral circular", square_spiral: "Espiral quadrada", cross: "Grade cruzada", user: "Sua trajetória" };
+  const PAT_COL = { lines: "e1", zigzag: "e2", spiral: "e3", square_spiral: "s4", cross: "s5", user: "s6" };
+  let PAT = null, patBusy = false;
+
+  // resposta tabelada em |dx|, |dy| (a resposta da caixa é simétrica): verdade e modelo do estimador
+  function responseTables(pr, L, h, depth) {
+    const n = 241, res = L / (n - 1), T = {
+      n, res, tTot: new Float32Array(n * n), tPk: new Float32Array(n * n), mTot: new Float32Array(n * n), mPk: new Float32Array(n * n)
+    };
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const k = j * n + i;
+      const [a, b] = countRates(pr, 1, i * res, j * res, 0, 0, h, depth, true, null, { side: P.angs });
+      const [c, d] = countRates(pr, 1, i * res, j * res, 0, 0, h);
+      T.tTot[k] = a; T.tPk[k] = b; T.mTot[k] = c; T.mPk[k] = d;
+    }
+    return T;
+  }
+  function look(T, tab, dx, dy) {
+    let i = Math.round(Math.abs(dx) / T.res), j = Math.round(Math.abs(dy) / T.res);
+    if (i >= T.n) i = T.n - 1; if (j >= T.n) j = T.n - 1;
+    return tab[j * T.n + i];
+  }
+  // posições de cada espectro de 1 s (3 subpontos por intervalo, como no voo animado)
+  function samplePath(wps, v) {
+    const cum = [0];
+    for (let i = 1; i < wps.length; i++) cum.push(cum[i - 1] + Math.hypot(wps[i][0] - wps[i - 1][0], wps[i][1] - wps[i - 1][1]));
+    const total = cum[cum.length - 1], M = Math.min(MAXM, Math.floor(total / (v * DT)));
+    const px = new Float64Array(M * 3), py = new Float64Array(M * 3);
+    let seg = 0;
+    for (let m = 0; m < M; m++) for (let q = 0; q < 3; q++) {
+      const d = (m + (2 * q + 1) / 6) * v * DT;
+      while (seg < cum.length - 2 && cum[seg + 1] < d) seg++;
+      const L = cum[seg + 1] - cum[seg], f = L > 0 ? (d - cum[seg]) / L : 0;
+      px[m * 3 + q] = wps[seg][0] + f * (wps[seg + 1][0] - wps[seg][0]);
+      py[m * 3 + q] = wps[seg][1] + f * (wps[seg + 1][1] - wps[seg][1]);
+    }
+    return { M, px, py, dist: total };
+  }
+
+  // um voo rápido: contagens de Poisson + localização por máxima verossimilhança numa grade 25 × 25
+  const BGN = 25;
+  function quickFlight(Q, path, A, sx, sy) {
+    const { M, px, py } = path, T = Q.T, useTot = Q.mode === "total";
+    const n = new Float64Array(M), ref = new Float64Array(M), mx = new Float64Array(M), my = new Float64Array(M);
+    const fG = Math.exp(-DT / 5), kG = Q.gps * Math.sqrt(1 - fG * fG);
+    let ex = Q.gps * gauss(), ey = Q.gps * gauss();      // erro de GPS AR(1), τ = 5 s
+    for (let i = 0; i < M; i++) {
+      let st = 0, sp = 0;
+      if (A > 0) for (let q = 0; q < 3; q++) {
+        const dx = sx - px[i * 3 + q], dy = sy - py[i * 3 + q];
+        st += look(T, T.tTot, dx, dy); sp += look(T, T.tPk, dx, dy);
+      }
+      st *= A / 3; sp *= A / 3;
+      const cx = px[i * 3 + 1], cy = py[i * 3 + 1], bg = Q.bgAt(cx, cy), fD = 1 / (1 + (st + bg) * TAU_DEAD);
+      const nPk = poisson((sp + bg * Q.wf) * fD * DT);
+      ref[i] = Q.mode === "peak_ref" ? poisson(bg * Q.wr * fD * DT) : 0;
+      n[i] = useTot ? nPk + poisson(bg * Q.wr * fD * DT) + poisson(Math.max(st - sp + bg * (1 - Q.wf - Q.wr), 0) * fD * DT) : nPk;
+      ex = fG * ex + kG * gauss(); ey = fG * ey + kG * gauss();
+      mx[i] = cx + ex; my[i] = cy + ey;
+    }
+    let s = null;
+    if (Q.mode === "peak_ref") {
+      s = new Float64Array(M);
+      for (let i = 0; i < M; i++) { let a = 0, c = 0; for (let j = Math.max(0, i - 4); j <= Math.min(M - 1, i + 4); j++) { a += ref[j]; c++; } s[i] = Math.max(a / c, 0.5 / 9); }
+    }
+    const tab = useTot ? T.mTot : T.mPk;
+    let sumN = 0, sumS = 0; for (let i = 0; i < M; i++) { sumN += n[i]; sumS += s ? s[i] : 1; }
+    const k0 = Math.max(sumN / sumS, 1e-9);
+    let ll0 = 0; for (let i = 0; i < M; i++) { const mu = k0 * (s ? s[i] : 1); ll0 += n[i] * Math.log(mu) - mu; }
+    const g = new Float64Array(M);
+    const fitAt = (x, y, iters, A0, b0) => {
+      let sumG = 0;
+      for (let i = 0; i < M; i++) { g[i] = look(T, tab, x - mx[i], y - my[i]) * DT; sumG += g[i]; }
+      let Ah = A0 ?? Math.max((sumN - k0 * sumS) / sumG, sumN * 1e-3 / sumG), b = b0 ?? k0;
+      for (let it = 0; it < iters; it++) {
+        let sA = 0, sB = 0;
+        for (let i = 0; i < M; i++) { const si = s ? s[i] : 1, r = n[i] / (Ah * g[i] + b * si); sA += r * g[i]; sB += r * si; }
+        Ah = Math.max(Ah * sA / sumG, 0); b = b * sB / sumS;
+      }
+      let ll = 0; for (let i = 0; i < M; i++) { const mu = Ah * g[i] + b * (s ? s[i] : 1); ll += n[i] * Math.log(mu) - mu; }
+      return { ll, A: Ah, b };
+    };
+    const L = Q.L, st = L / (BGN - 1);
+    let best = { ll: -Infinity };
+    for (let j = 0; j < BGN; j++) for (let i = 0; i < BGN; i++) {
+      const r = fitAt(i * st, j * st, 15);
+      if (r.ll > best.ll) best = { ...r, x: i * st, y: j * st };
+    }
+    const c0 = best;
+    for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) {
+      if (!i && !j) continue;
+      const x = c0.x + i * st / 3, y = c0.y + j * st / 3;
+      if (x < 0 || x > L || y < 0 || y > L) continue;
+      const r = fitAt(x, y, 10, c0.A, c0.b);
+      if (r.ll > best.ll) best = { ...r, x, y };
+    }
+    // ΔlnL entre a melhor posição e a posição real (calibra a região de 95%)
+    const dTrue = A > 0 && Q.wantTrue ? Math.max(0, best.ll - fitAt(sx, sy, 25, best.A, best.b).ll) : null;
+    return { D: best.ll - ll0, err: Math.hypot(best.x - sx, best.y - sy), dTrue };
+  }
+
+  const yieldUI = () => new Promise(r => setTimeout(r, 0));
+  async function runPatterns() {
+    if (patBusy) return;
+    patBusy = true; running = false; $("play").textContent = "Iniciar";
+    const btn = $("patRun"), prog = $("patProg"), bar = prog.querySelector("i");
+    btn.disabled = true; prog.hidden = false; bar.style.width = "0";
+    const L = FIELD, b = P.b, bvar = P.bvar;
+    const Q = {
+      L, mode: P.mode, gps: P.gps, wf: wfB, wr: wrB,
+      bgAt: (x, y) => { const i = Math.min(L, Math.max(0, Math.round(x))), j = Math.min(L, Math.max(0, Math.round(y))); return b * Math.exp(bvar * BGF[j * BN + i] - bvar * bvar / 2); }
+    };
+    $("patStatus").textContent = "Preparando a resposta do detector…"; await yieldUI();
+    Q.T = responseTables(PR, L, P.h, P.depth);
+    const pats = ["lines", "zigzag", "spiral", "square_spiral", "cross"];
+    const userW = drawPts.length > 1 ? drawPts.map(p => p.slice())
+      : (P.strat === "pilot" && S.tx.length > 10 ? S.tx.map((x, i) => [x, S.ty[i]]) : null);
+    if (userW) pats.push("user");
+    const paths = {};
+    for (const k of pats) paths[k] = samplePath(k === "user" ? userW : planWaypoints(k, L, P.s), P.v);
+    // escada de atividades em torno de uma estimativa (informação de Fisher, fonte no centro, linhas paralelas)
+    const pl = paths.lines, tab = P.mode === "total" ? Q.T.mTot : Q.T.mPk, bb = P.mode === "total" ? b : b * wfB;
+    let S2 = 0; for (let i = 0; i < pl.M; i++) { const gi = look(Q.T, tab, L / 2 - pl.px[i * 3 + 1], L / 2 - pl.py[i * 3 + 1]) * DT; S2 += gi * gi / (bb * DT); }
+    const A95 = (Math.sqrt(2 * 8) + 1.645) / Math.sqrt(Math.max(S2, 1e-30));
+    const acts = Array.from({ length: 9 }, (_, k) => A95 * 0.5 * Math.pow(2, k / 2));
+    const NN = 100, NA = 30, NC = 50, total = pats.length * (NN + NA * acts.length + NC);
+    let done = 0, last = performance.now();
+    const res = [];
+    for (const k of pats) {
+      const path = paths[k];
+      const r = { k, M: path.M, dist: path.dist, pd: [], thr: 0 };
+      if (path.M < 5) { res.push(r); done += NN + NA * acts.length + NC; continue; }
+      const D0 = [];
+      const tick = async () => {
+        done++;
+        if (performance.now() - last > 60) { bar.style.width = (100 * done / total).toFixed(1) + "%"; $("patStatus").textContent = `${PAT_NAMES[k]}: ${done} de ${total} voos simulados…`; last = performance.now(); await yieldUI(); }
+      };
+      for (let i = 0; i < NN; i++) { D0.push(quickFlight(Q, path, 0, 0, 0).D); await tick(); }
+      D0.sort((a, c) => a - c); r.thr = D0[Math.min(NN - 1, Math.floor(0.99 * NN))];
+      for (const A of acts) {
+        let det = 0;
+        for (let i = 0; i < NA; i++) { if (quickFlight(Q, path, A, rnd() * L, rnd() * L).D > r.thr) det++; await tick(); }
+        r.pd.push(det / NA);
+      }
+      let det = 0; const errs = [];
+      for (let i = 0; i < NC; i++) { const q = quickFlight(Q, path, P.A, rnd() * L, rnd() * L); if (q.D > r.thr) { det++; errs.push(q.err); } await tick(); }
+      errs.sort((a, c) => a - c);
+      r.pdCur = det / NC; r.errMed = errs.length ? errs[Math.floor(errs.length / 2)] : null;
+      // atividade mínima: primeira passagem por 95%, interpolada em log
+      const i95 = r.pd.findIndex(p => p >= 0.95);
+      r.mda = i95 < 0 ? { gt: acts[acts.length - 1] } : i95 === 0 ? { le: acts[0] }
+        : { v: Math.exp(Math.log(acts[i95 - 1]) + (0.95 - r.pd[i95 - 1]) / Math.max(r.pd[i95] - r.pd[i95 - 1], 1e-9) * (Math.log(acts[i95]) - Math.log(acts[i95 - 1]))) };
+      res.push(r);
+    }
+    PAT = { acts, res, nuc: P.nuc, h: P.h, v: P.v, s: P.s, L, A: P.A };
+    bar.style.width = "100%";
+    $("patStatus").textContent = `${P.nuc}, ${P.h} m de altura, ${P.v} m/s, passadas a cada ${P.s} m, área de ${L} × ${L} m, background de ${P.b} cps. ${total.toLocaleString("pt-BR")} voos simulados.`;
+    btn.disabled = false; patBusy = false;
+    setTimeout(() => { prog.hidden = true; }, 600);
+    drawPatterns();
+  }
+
+  function drawPatterns() {
+    const cv = $("patChart"), { ctx, w, h } = fit(cv), pad = { l: 44, r: 12, t: 12, b: 40 };
+    ctx.clearRect(0, 0, w, h); axes(ctx, w, h, pad);
+    const legend = $("patLegend"), tb = $("patTable");
+    if (!PAT) {
+      ctx.fillStyle = C.muted; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "13px " + getComputedStyle(document.body).fontFamily;
+      ctx.fillText("A curva de detecção aparece aqui depois da comparação", (pad.l + w - pad.r) / 2, (pad.t + h - pad.b) / 2);
+      legend.innerHTML = ""; return;
+    }
+    const { acts, res } = PAT, la0 = Math.log10(acts[0]), la1 = Math.log10(acts[acts.length - 1]);
+    const X = a => pad.l + (Math.log10(a) - la0) / (la1 - la0) * (w - pad.l - pad.r), Y = p => h - pad.b - p * (h - pad.t - pad.b);
+    ctx.font = "10.5px 'JetBrains Mono', monospace"; ctx.fillStyle = C.muted;
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (const p of [0, 0.25, 0.5, 0.75, 1]) {
+      ctx.fillText(Math.round(p * 100) + "%", pad.l - 6, Y(p));
+      ctx.strokeStyle = C.grid; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.moveTo(pad.l, Y(p) + 0.5); ctx.lineTo(w - pad.r, Y(p) + 0.5); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const lstep = w < 520 ? 4 : 2;
+    acts.forEach((a, i) => { if (i % lstep === 0) { ctx.textAlign = i === 0 ? "left" : i === acts.length - 1 ? "right" : "center"; ctx.fillText(fmtA(a), X(a), h - pad.b + 5); } });
+    ctx.textAlign = "center";
+    ctx.fillText("Atividade da fonte (escala log)", (pad.l + w - pad.r) / 2, h - pad.b + 21);
+    ctx.strokeStyle = C.muted; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(pad.l, Y(0.95) + 0.5); ctx.lineTo(w - pad.r, Y(0.95) + 0.5); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = C.muted; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillText("95%", pad.l + 4, Y(0.95) - 2);
+    for (const r of res) {
+      if (!r.pd.length) continue;
+      const col = C[PAT_COL[r.k]];
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath();
+      r.pd.forEach((p, i) => i ? ctx.lineTo(X(acts[i]), Y(p)) : ctx.moveTo(X(acts[i]), Y(p))); ctx.stroke();
+      for (let i = 0; i < acts.length; i++) {
+        ctx.beginPath(); ctx.arc(X(acts[i]), Y(r.pd[i]), 4, 0, 7); ctx.fillStyle = col; ctx.fill();
+        ctx.strokeStyle = C.panel; ctx.lineWidth = 1.5; ctx.stroke();
+      }
+    }
+    legend.innerHTML = res.map(r => `<span><span class="swatch" style="background:${C[PAT_COL[r.k]]}"></span>${PAT_NAMES[r.k]}</span>`).join("");
+    const mdaTxt = m => !m ? "—" : m.v ? fmtA(m.v) : m.le ? "≤ " + fmtA(m.le) : "> " + fmtA(m.gt);
+    const ok = res.filter(r => r.mda && r.mda.v), bestK = ok.length ? ok.reduce((a, c) => c.mda.v < a.mda.v ? c : a).k : null;
+    tb.innerHTML = res.map(r => `<tr>
+      <td><span class="swatch" style="background:${C[PAT_COL[r.k]]}"></span>${PAT_NAMES[r.k]}${r.k === bestK ? " ★" : ""}</td>
+      <td>${fmtT(r.M * DT)}</td><td>${Math.round(r.dist)} m</td>
+      <td>${r.pdCur != null ? Math.round(r.pdCur * 100) + "%" : "—"}</td>
+      <td>${r.errMed != null ? fmtM(r.errMed) : "—"}</td>
+      <td>${mdaTxt(r.mda)}</td></tr>`).join("") +
+      `<tr><td colspan="6" class="muted">★ menor atividade mínima. Atividade escolhida: ${fmtA(PAT.A)}.</td></tr>`;
+  }
+  // dica ao passar o mouse no gráfico de detecção
+  $("patChart").addEventListener("mousemove", e => {
+    const tip = $("patTip");
+    if (!PAT) { tip.style.display = "none"; return; }
+    const cv = $("patChart"), rc = cv.getBoundingClientRect(), pad = { l: 44, r: 12, t: 12, b: 40 }, w = rc.width, h = rc.height;
+    const { acts, res } = PAT, la0 = Math.log10(acts[0]), la1 = Math.log10(acts[acts.length - 1]);
+    const mx = e.clientX - rc.left, my = e.clientY - rc.top;
+    let best = null, bd = 18;
+    for (const r of res) r.pd.forEach((p, i) => {
+      const x = pad.l + (Math.log10(acts[i]) - la0) / (la1 - la0) * (w - pad.l - pad.r), y = h - pad.b - p * (h - pad.t - pad.b);
+      const d = Math.hypot(x - mx, y - my); if (d < bd) { bd = d; best = { r, i, x, y }; }
+    });
+    if (!best) { tip.style.display = "none"; return; }
+    tip.innerHTML = `${PAT_NAMES[best.r.k]}<br>${fmtA(acts[best.i])}: detectada em ${Math.round(best.r.pd[best.i] * 100)}% dos voos`;
+    tip.style.display = "block";
+    tip.style.left = Math.min(best.x + 10, w - tip.offsetWidth - 4) + "px"; tip.style.top = Math.max(best.y - 44, 0) + "px";
+  });
+  $("patChart").addEventListener("mouseleave", () => { $("patTip").style.display = "none"; });
+  $("patRun").addEventListener("click", runPatterns);
+
+  // calibração automática do limiar: 200 voos sem fonte por estimador, com os parâmetros atuais
+  let calToken = 0;
+  function calibKey() {
+    const pat = ["lines", "zigzag", "spiral", "square_spiral", "cross"].includes(P.strat) ? P.strat : "lines";
+    return [P.nuc, FIELD, P.h, P.v, P.s, P.b, P.bvar, P.gps, P.T, pat, bgSeed].join("|");
+  }
+  async function calibrate() {
+    const key = calibKey(), tok = ++calToken;
+    calKey = key;
+    if (CAL[key] && CAL[key].done) { refreshDet(); calibrateRegion(tok); return; }
+    CAL[key] = CAL[key] || {};
+    const L = FIELD, b = P.b, bvar = P.bvar, pat = key.split("|")[9];
+    const Q = { L, gps: P.gps, wf: wfB, wr: wrB, T: responseTables(PR, L, P.h, 0),
+      bgAt: (x, y) => { const i = Math.min(L, Math.max(0, Math.round(x))), j = Math.min(L, Math.max(0, Math.round(y))); return b * Math.exp(bvar * BGF[j * BN + i] - bvar * bvar / 2); } };
+    const path = samplePath(planWaypoints(pat, L, P.s), P.v);
+    if (path.M < 5) return;
+    const modes = [P.mode, ...["peak", "peak_ref", "total"].filter(m => m !== P.mode)];
+    for (const mode of modes) {
+      Q.mode = mode; const D = [];
+      for (let i = 0; i < 200; i++) {
+        if (tok !== calToken) return;           // os parâmetros mudaram: abandona
+        while (patBusy) await new Promise(r => setTimeout(r, 300));
+        D.push(quickFlight(Q, path, 0, 0, 0).D);
+        if (i % 10 === 9) { if (mode === P.mode) $("rThr").textContent = `calibrando (${i + 1}/200 voos sem fonte)…`; await yieldUI(); }
+      }
+      D.sort((a, c) => a - c);
+      CAL[key][mode] = D[Math.floor(0.99 * D.length)];
+      if (mode === P.mode) refreshDet();
+    }
+    CAL[key].done = true; refreshDet();
+    calibrateRegion(tok);
+  }
+  // região de 95%: quantil 95% do ΔlnL entre a estimativa e a posição real, em voos com fonte que detectaram
+  async function calibrateRegion(tok) {
+    const rk = regKey();
+    if (REG[rk] && REG[rk].done) { refreshDet(); return; }
+    const thr = thrFor(P.nuc, P.mode); if (thr == null) return;
+    const L = FIELD, b = P.b, bvar = P.bvar, pat = calKey.split("|")[9];
+    const Q = { L, mode: P.mode, gps: P.gps, wf: wfB, wr: wrB, wantTrue: true, T: responseTables(PR, L, P.h, P.depth),
+      bgAt: (x, y) => { const i = Math.min(L, Math.max(0, Math.round(x))), j = Math.min(L, Math.max(0, Math.round(y))); return b * Math.exp(bvar * BGF[j * BN + i] - bvar * bvar / 2); } };
+    const path = samplePath(planWaypoints(pat, L, P.s), P.v);
+    if (path.M < 5) return;
+    const NR = 150, d = [];
+    REG[rk] = {};
+    for (let i = 0; i < NR; i++) {
+      if (tok !== calToken) { delete REG[rk]; return; }
+      while (patBusy) await new Promise(r => setTimeout(r, 300));
+      const q = quickFlight(Q, path, P.A, L * rnd(), L * rnd());
+      if (q.D > thr) d.push(q.dTrue);
+      if (i % 10 === 9) { $("rReg").textContent = `calibrando a região (${i + 1}/${NR} voos com fonte)…`; await yieldUI(); }
+    }
+    if (d.length < 30) REG[rk] = { done: true, msg: `não calibrada: só ${d.length} de ${NR} voos detectaram a fonte nesta atividade, poucos para calibrar` };
+    else { d.sort((a, c) => a - c); REG[rk] = { done: true, n: d.length, [P.mode]: Math.max(1, d[Math.floor(0.95 * (d.length - 1))]) }; }
+    refreshDet();
+  }
+  function refreshDet() {
+    const thr = thrFor(P.nuc, P.mode) ?? 10;
+    S.firstDet = null;
+    for (const q of S.hist) { q.det = q.D > thr; if (q.det && S.firstDet === null) S.firstDet = q.t; }
+    if (S.best >= 0) {   // raio da região com o ΔlnL atual
+      const reg = regFor(P.mode), top = S.ll[S.best]; let cells = 0;
+      for (let p = 0; p < NPT; p++) if (S.ll[p] - top > -reg) cells++;
+      S.unc = Math.sqrt(cells * GS * GS / Math.PI);
+    }
+    if (S.done) compareEstimators();
+    drawAll();
+  }
+
+  // ---------- loop ----------
+  let running = true, acc = 0, last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.25, (now - last) / 1000); last = now;
+    if (running && !S.done) {
+      acc += dt * (P.strat === "pilot" ? Math.min(P.rate, 3) : P.rate);
+      let k = 0;
+      while (acc >= DT && k < 60) { step(); acc -= DT; k++; if (S.done) break; }
+      if (S.done) { running = false; $("play").textContent = "Iniciar"; }
+      if (k) drawAll();
+    }
+    requestAnimationFrame(frame);
+  }
+  function restart() { reset(); acc = 0; drawAll(); }
+  const go = () => { restart(); running = true; $("play").textContent = "Pausar"; calibrate(); };
+  for (const id of ["nuc", "mode", "strat", "act", "alt", "spd", "spc", "bkg", "depth", "gps", "tmp", "fld", "att", "altS", "env", "rel", "follow", "src2", "r2", "angs"]) $(id).addEventListener("input", go);
+  $("src2").addEventListener("change", go);
+  $("bvar").addEventListener("input", () => { bgImg = null; go(); });
+  $("rate").addEventListener("input", readParams);
+  for (const id of ["showSrc", "showLL", "showBg", "showDose"]) $(id).addEventListener("change", drawMap);
+  for (const id of ["pkLine", "pkSrc"]) $(id).addEventListener("change", drawPeak);
+  $("mapView").addEventListener("change", drawMap);
+  $("cmpNow").addEventListener("click", () => { compareEstimators(); drawCompare(); });
+  $("play").addEventListener("click", () => { if (S.done) restart(); running = !running; $("play").textContent = running ? "Pausar" : "Iniciar"; });
+  $("restart").addEventListener("click", go);
+  $("newsrc").addEventListener("click", () => {
+    src = { x: FIELD * (0.05 + 0.9 * rnd()), y: FIELD * (0.05 + 0.9 * rnd()) };
+    src2 = { x: FIELD * (0.05 + 0.9 * rnd()), y: FIELD * (0.05 + 0.9 * rnd()) }; go();
+  });
+  $("newbg").addEventListener("click", () => { bgSeed++; makeBgField(); makeTerrain(); bgImg = null; terImg = null; go(); });
+  map.addEventListener("click", e => {
+    const r = map.getBoundingClientRect(), g = mapGeom();
+    const x = (e.clientX - r.left - g.ox) / g.k, y = (g.oy - (e.clientY - r.top)) / g.k;
+    if (x < 0 || x > FIELD || y < 0 || y > FIELD) return;
+    if (P.strat === "draw" && !e.shiftKey) {
+      drawPts.push([x, y]); updateDrawInfo();
+      if (S.waiting) S.plan = drawPts.map(p => p.slice());
+      drawMap(); return;
+    }
+    if (P.src2 && (e.altKey || e.ctrlKey || e.metaKey)) src2 = { x, y }; else src = { x, y };
+    go();
+  });
+  $("drawGo").addEventListener("click", go);
+  $("drawUndo").addEventListener("click", () => { drawPts.pop(); updateDrawInfo(); drawMap(); });
+  $("drawClear").addEventListener("click", () => { drawPts = []; updateDrawInfo(); if (S.waiting || S.done) { S.plan = []; } drawMap(); });
+  // pilotagem manual
+  const KEYS = { ArrowUp: [0, 1], KeyW: [0, 1], ArrowDown: [0, -1], KeyS: [0, -1], ArrowLeft: [-1, 0], KeyA: [-1, 0], ArrowRight: [1, 0], KeyD: [1, 0] };
+  const held = new Set();
+  const setDir = (x, y) => { const n = Math.hypot(x, y); S.dir = n ? [x / n, y / n] : [0, 0]; if (!S.done && !running) { running = true; $("play").textContent = "Pausar"; } };
+  addEventListener("keydown", e => {
+    if (P.strat !== "pilot" || S.done) return;
+    const tg = e.target.tagName; if (tg === "INPUT" || tg === "SELECT" || tg === "TEXTAREA") return;
+    if (e.code === "Space") { e.preventDefault(); setDir(0, 0); return; }
+    if (!KEYS[e.code]) return;
+    e.preventDefault(); held.add(e.code);
+    let x = 0, y = 0; for (const k of held) { x += KEYS[k][0]; y += KEYS[k][1]; }
+    setDir(x, y);
+  });
+  addEventListener("keyup", e => held.delete(e.code));
+  addEventListener("blur", () => held.clear());
+  for (const b of document.querySelectorAll(".dpad button")) b.addEventListener("click", () => { const [x, y] = b.dataset.d.split(",").map(Number); setDir(x, y); });
+  $("pilotEnd").addEventListener("click", () => { if (P.strat !== "pilot" || S.done) return; S.pilotEnd = true; running = true; $("play").textContent = "Pausar"; });
+  $("copy").addEventListener("click", async () => {
+    const rows = ["t_s,x_gps_m,y_gps_m,x_real_m,y_real_m,dz_real_m,roll_graus,pitch_graus,contagens_total,contagens_janela_pico,contagens_janela_ref"];
+    for (let i = 0; i < S.used.length; i++) rows.push([(i + 1) * DT, S.mx[i].toFixed(2), S.my[i].toFixed(2), S.tx[i].toFixed(2), S.ty[i].toFixed(2), S.zt[i].toFixed(2), S.rollH[i].toFixed(1), S.pitchH[i].toFixed(1), S.nTot[i], S.nPk[i], S.nRef[i]].join(","));
+    try { await navigator.clipboard.writeText(rows.join("\n")); $("hint").textContent = `${S.used.length} medidas copiadas para a área de transferência.`; }
+    catch { $("hint").textContent = "Não foi possível copiar automaticamente neste visualizador."; }
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => { readColors(); bgImg = null; drawAll(); drawPatterns(); });
+  new MutationObserver(() => { readColors(); bgImg = null; drawAll(); drawPatterns(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  addEventListener("resize", () => { drawAll(); drawPatterns(); });
+
+  // atalho usado pelas seções de resultados: abre um cenário no simulador
+  window.SARPI = {
+    setScenario(o) {
+      const set = (id, v) => { if (v !== undefined) $(id).value = v; };
+      set("nuc", o.nuc); set("mode", o.mode); set("strat", o.strat); set("fld", o.L); set("alt", o.h); set("spd", o.v); set("spc", o.s);
+      set("bkg", o.b); set("bvar", o.bvar); set("depth", o.depth); set("gps", o.gps); set("att", o.att); set("altS", o.altS);
+      set("env", o.env); set("rel", o.rel); set("angs", o.angs);
+      if (o.A) $("act").value = Math.log10(o.A / 1e6);
+      if (o.src2 !== undefined) $("src2").checked = o.src2;
+      bgImg = null; terImg = null; go();
+      document.getElementById("simulador").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    },
+    PHYS, colors: () => C
+  };
+  // cenário da Figura 2 do banner do Workshop Nuclear 2026 (também abre com #banner no endereço)
+  readColors(); makeBgField(); makeTerrain(); reset();
+  for (let i = 0; i < 90; i++) step();
+  estimate(10);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { running = false; $("play").textContent = "Iniciar"; }
+  drawAll(); drawPatterns(); calibrate();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+
+</body></html>
